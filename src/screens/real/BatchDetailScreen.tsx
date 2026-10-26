@@ -18,6 +18,7 @@ import {
 } from '../../lib/api/privateBatches';
 import { DAY_KEYS, DAY_LABELS, isClosed } from '../../lib/utils/schedule';
 import { formatDateLong, rupees } from '../../lib/utils/format';
+import { courseLabel } from '../../lib/utils/months';
 import { AppText, Avatar, Card, Divider, EmptyState, HeroCard, KeyValue, Pill, Row, SectionHeader } from '../../components/ui/base';
 import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
@@ -166,7 +167,25 @@ export function BatchDetailScreen() {
               {members.map((r, i) => (
                 <View key={r.id} style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}>
                   {i > 0 ? <Divider style={{ marginBottom: spacing.md }} /> : null}
-                  <StudentLine row={r} />
+                  <Pressable
+                    onPress={() => navigation.navigate('StudentFees', { batchId: b.id, membershipId: r.id })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${r.first_name}'s fees`}
+                    style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                  >
+                    <Row gap={spacing.sm}>
+                      <View style={{ flex: 1 }}>
+                        <StudentLine row={r} />
+                      </View>
+                      <Row gap={4}>
+                        <Ionicons name="wallet-outline" size={15} color={colors.primary} />
+                        <AppText variant="captionStrong" tone="primary">
+                          Fees
+                        </AppText>
+                        <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+                      </Row>
+                    </Row>
+                  </Pressable>
                   <Row justify="space-between" style={{ marginTop: spacing.sm }}>
                     <AppText variant="caption" tone="muted" style={{ flex: 1 }} numberOfLines={1}>
                       {r.account_name}
@@ -205,6 +224,7 @@ export function BatchDetailScreen() {
           </Row>
           <Divider style={{ marginVertical: spacing.md }} />
           <KeyValue label="Monthly fee" value={`${rupees(b.monthly_fee)} / month`} />
+          <KeyValue label="Course" value={courseLabel(b.course_start, b.course_end) ?? 'Not set — tap Edit'} />
           <KeyValue label="Seats" value={`${members.length} of ${b.capacity} filled`} />
           {b.room ? <KeyValue label="Room / venue" value={b.room} /> : null}
           <KeyValue label="Created" value={formatDateLong(b.created_at.slice(0, 10))} />

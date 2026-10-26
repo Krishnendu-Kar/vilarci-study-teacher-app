@@ -14,6 +14,8 @@ import {
 } from '../../lib/api/privateBatches';
 import { useTeacherProfile } from '../../lib/api/teacherProfile';
 import { summarizeSchedule } from '../../lib/utils/schedule';
+import { addMonths, courseLabel, currentMonth } from '../../lib/utils/months';
+import { MonthPicker } from '../../components/real/MonthPicker';
 import { AppText, Chip, Row, SectionHeader } from '../../components/ui/base';
 import { Button } from '../../components/ui/Button';
 import { FormField } from '../../components/ui/Field';
@@ -22,7 +24,7 @@ import { ErrorBanner } from '../../components/auth/AuthKit';
 import { RealTopBar } from '../../components/real/RealTopBar';
 import { badScheduleDays, fromDraft, toDraft, WeeklyScheduleEditor } from '../../components/real/WeeklyScheduleEditor';
 
-type Errors = Partial<Record<'name' | 'subject' | 'grade' | 'board' | 'fee' | 'capacity' | 'schedule', string>>;
+type Errors = Partial<Record<'name' | 'subject' | 'grade' | 'board' | 'fee' | 'capacity' | 'schedule' | 'course', string>>;
 
 const OTHER = 'Other';
 
@@ -49,6 +51,8 @@ export function BatchFormScreen() {
   const [fee, setFee] = useState(existing ? String(existing.monthly_fee) : '');
   const [capacity, setCapacity] = useState(existing ? String(existing.capacity) : '20');
   const [schedule, setSchedule] = useState(() => toDraft(existing?.weekly_schedule));
+  const [courseStart, setCourseStart] = useState(existing?.course_start ?? currentMonth());
+  const [courseEnd, setCourseEnd] = useState(existing?.course_end ?? addMonths(existing?.course_start ?? currentMonth(), 11));
   const [errors, setErrors] = useState<Errors>({});
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -69,6 +73,8 @@ export function BatchFormScreen() {
       e.capacity = `Seats must be ${BATCH_LIMITS.capacityMin}–${BATCH_LIMITS.capacityMax}.`;
     }
     if (badScheduleDays(schedule).length) e.schedule = 'Fix the highlighted class timings.';
+    if (courseEnd < courseStart) e.course = 'The course must end on or after the start month.';
+    else if (courseEnd > addMonths(courseStart, 35)) e.course = 'A course can run for at most 36 months.';
     setErrors(e);
     setFailure(null);
     if (Object.keys(e).length) return;
@@ -85,6 +91,8 @@ export function BatchFormScreen() {
           monthly_fee: feeNum,
           capacity: capNum,
           weekly_schedule: fromDraft(schedule),
+          course_start: courseStart,
+          course_end: courseEnd,
         },
       });
       toast.toast(editingId ? 'Batch updated' : `${n} created`, 'success');
@@ -190,6 +198,34 @@ export function BatchFormScreen() {
               containerStyle={{ flex: 1 }}
             />
           </Row>
+        </View>
+
+        <View style={{ marginTop: spacing.xxl }}>
+          <SectionHeader title="Course duration" subtitle={courseLabel(courseStart, courseEnd) ?? undefined} />
+          <Row gap={spacing.md}>
+            <MonthPicker
+              label="Starts"
+              value={courseStart}
+              onChange={(v) => {
+                setCourseStart(v);
+                if (courseEnd < v) setCourseEnd(addMonths(v, 11));
+                clear('course');
+              }}
+            />
+            <MonthPicker
+              label="Ends"
+              value={courseEnd}
+              min={courseStart}
+              max={addMonths(courseStart, 35)}
+              onChange={(v) => {
+                setCourseEnd(v);
+                clear('course');
+              }}
+            />
+          </Row>
+          <AppText variant="caption" tone={errors.course ? 'error' : 'muted'} style={{ marginTop: spacing.sm }}>
+            {errors.course ?? 'Every student’s fee ledger runs month by month across this period.'}
+          </AppText>
         </View>
 
         <View style={{ marginTop: spacing.xxl }}>

@@ -17,6 +17,7 @@ import { AccountScreen } from '../screens/real/AccountScreen';
 import { BatchesScreen as RealBatchesScreen } from '../screens/real/BatchesScreen';
 import { BatchFormScreen } from '../screens/real/BatchFormScreen';
 import { BatchDetailScreen } from '../screens/real/BatchDetailScreen';
+import { StudentFeesScreen } from '../screens/real/StudentFeesScreen';
 import { ComingSoonScreen, InstitutesComingSoon } from '../screens/real/ComingSoonScreen';
 import { MoreScreen as RealMoreScreen } from '../screens/real/MoreScreen';
 
@@ -59,6 +60,7 @@ function RealBatchesNavigator() {
       <RealBatchesStack.Screen name="BatchList" component={RealBatchesScreen} />
       <RealBatchesStack.Screen name="BatchForm" component={BatchFormScreen} />
       <RealBatchesStack.Screen name="BatchDetail" component={BatchDetailScreen} />
+      <RealBatchesStack.Screen name="StudentFees" component={StudentFeesScreen} />
     </RealBatchesStack.Navigator>
   );
 }

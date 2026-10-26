@@ -18,13 +18,16 @@ export interface PrivateBatchRow {
   monthly_fee: number;
   capacity: number;
   join_code: string;
+  /** First day of the course's first and last month, e.g. "2026-04-01". */
+  course_start: string | null;
+  course_end: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export type BatchInput = Pick<
   PrivateBatchRow,
-  'name' | 'subject' | 'grade' | 'board' | 'room' | 'weekly_schedule' | 'monthly_fee' | 'capacity'
+  'name' | 'subject' | 'grade' | 'board' | 'room' | 'weekly_schedule' | 'monthly_fee' | 'capacity' | 'course_start' | 'course_end'
 >;
 
 export const BATCH_LIMITS = {
@@ -149,6 +152,7 @@ export function describeBatchError(err: unknown): string {
   if (/at most 50 private batches/i.test(msg)) return `You can have up to ${BATCH_LIMITS.perTeacher} private batches.`;
   if (/foreign key|teachers/i.test(msg)) return 'Create your teacher profile first.';
   if (/weekly_schedule/i.test(msg)) return 'Check the weekly timings and try again.';
+  if (/course_check/i.test(msg)) return 'The course must end on or after it starts, within 36 months.';
   if (/capacity/i.test(msg)) return `Seats must be between ${BATCH_LIMITS.capacityMin} and ${BATCH_LIMITS.capacityMax}.`;
   if (/monthly_fee/i.test(msg)) return 'Enter a valid monthly fee.';
   if (/name_check|name/i.test(msg)) return `Batch name must be ${BATCH_LIMITS.nameMin}–${BATCH_LIMITS.nameMax} characters.`;
