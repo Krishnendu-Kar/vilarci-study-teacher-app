@@ -128,6 +128,8 @@ export function TeacherHomeScreen() {
                   {t.bio}
                 </AppText>
               ) : null}
+              <ProfileList title="Achievements" icon="trophy" items={t.achievements} />
+              <ProfileList title="Authored books" icon="book" items={t.authored_books} />
             </Card>
           ) : (
             <Card>
@@ -174,6 +176,28 @@ export function TeacherHomeScreen() {
           </Card>
         </View>
       </Screen>
+    </View>
+  );
+}
+
+function ProfileList({ title, icon, items }: { title: string; icon: IconName; items: string[] }) {
+  const { colors } = useTheme();
+  if (!items?.length) return null;
+  return (
+    <View style={{ marginTop: spacing.lg }}>
+      <AppText variant="overline" tone="muted" style={{ marginBottom: spacing.sm }}>
+        {title.toUpperCase()}
+      </AppText>
+      <View style={{ gap: spacing.sm }}>
+        {items.map((item) => (
+          <Row key={item} gap={spacing.sm} align="flex-start">
+            <Ionicons name={icon} size={15} color={colors.gold} style={{ marginTop: 2 }} />
+            <AppText variant="bodyStrong" style={{ flex: 1 }}>
+              {item}
+            </AppText>
+          </Row>
+        ))}
+      </View>
     </View>
   );
 }

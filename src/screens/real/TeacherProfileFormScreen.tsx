@@ -9,6 +9,9 @@ import {
   BIO_MAX,
   describeTeacherError,
   EXPERIENCE_MAX,
+  LIST_ITEM_MAX,
+  LIST_ITEM_MIN,
+  LIST_MAX_ITEMS,
   QUALIFICATION_MAX,
   QUALIFICATION_MIN,
   SUBJECT_MAX,
@@ -20,6 +23,7 @@ import { AppText, Chip, Row } from '../../components/ui/base';
 import { Button } from '../../components/ui/Button';
 import { useToast } from '../../components/ui/Toast';
 import { AuthField, ErrorBanner } from '../../components/auth/AuthKit';
+import { ListEditor } from '../../components/real/ListEditor';
 
 type Errors = Partial<Record<'subject' | 'qualification' | 'experience', string>>;
 
@@ -42,6 +46,8 @@ export function TeacherProfileFormScreen() {
   const [qualification, setQualification] = useState(existing?.qualification ?? '');
   const [experience, setExperience] = useState(existing?.experience_years != null ? String(existing.experience_years) : '');
   const [bio, setBio] = useState(existing?.bio ?? '');
+  const [achievements, setAchievements] = useState<string[]>(existing?.achievements ?? []);
+  const [books, setBooks] = useState<string[]>(existing?.authored_books ?? []);
   const [errors, setErrors] = useState<Errors>({});
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -63,7 +69,14 @@ export function TeacherProfileFormScreen() {
     try {
       await save.mutateAsync({
         exists: Boolean(existing),
-        input: { primary_subject: finalSubject, qualification: q, experience_years: years, bio: bio.trim() },
+        input: {
+          primary_subject: finalSubject,
+          qualification: q,
+          experience_years: years,
+          bio: bio.trim(),
+          achievements,
+          authored_books: books,
+        },
       });
       toast.toast(existing ? 'Teacher profile updated' : 'Teacher profile created', 'success');
       navigation.goBack();
@@ -166,6 +179,27 @@ export function TeacherProfileFormScreen() {
           value={bio}
           onChangeText={setBio}
           style={{ minHeight: 110, textAlignVertical: 'top' }}
+        />
+
+        <ListEditor
+          label="Achievements"
+          icon="trophy-outline"
+          placeholder="e.g. 100+ Selections in NEET 2025"
+          items={achievements}
+          onChange={setAchievements}
+          maxItems={LIST_MAX_ITEMS}
+          minLength={LIST_ITEM_MIN}
+          maxLength={LIST_ITEM_MAX}
+        />
+        <ListEditor
+          label="Authored books"
+          icon="book-outline"
+          placeholder="Book title"
+          items={books}
+          onChange={setBooks}
+          maxItems={LIST_MAX_ITEMS}
+          minLength={LIST_ITEM_MIN}
+          maxLength={LIST_ITEM_MAX}
         />
 
         <Button

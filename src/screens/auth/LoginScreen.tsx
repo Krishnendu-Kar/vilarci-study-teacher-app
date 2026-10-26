@@ -116,7 +116,7 @@ export function LoginScreen() {
           <Row gap={spacing.md}>
             <View style={styles.rule(colors.border)} />
             <AppText variant="caption" tone="muted">
-              New to Vilarci?
+              New to Vilarci Teacher?
             </AppText>
             <View style={styles.rule(colors.border)} />
           </Row>

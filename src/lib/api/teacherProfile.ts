@@ -12,11 +12,16 @@ export interface TeacherProfile {
   experience_years: number | null;
   bio: string;
   avatar_url: string | null;
+  achievements: string[];
+  authored_books: string[];
   created_at: string;
   updated_at: string;
 }
 
-export type TeacherProfileInput = Pick<TeacherProfile, 'qualification' | 'primary_subject' | 'experience_years' | 'bio'>;
+export type TeacherProfileInput = Pick<
+  TeacherProfile,
+  'qualification' | 'primary_subject' | 'experience_years' | 'bio' | 'achievements' | 'authored_books'
+>;
 
 export const SUBJECTS = [
   'Mathematics',
@@ -37,6 +42,10 @@ export const QUALIFICATION_MAX = 80;
 export const SUBJECT_MAX = 40;
 export const BIO_MAX = 300;
 export const EXPERIENCE_MAX = 70;
+/** achievements / authored_books: up to 10 items, 3–120 characters each. */
+export const LIST_MAX_ITEMS = 10;
+export const LIST_ITEM_MIN = 3;
+export const LIST_ITEM_MAX = 120;
 
 const key = (accountId: string | undefined) => ['teacher-profile', accountId] as const;
 
@@ -76,6 +85,9 @@ export function describeTeacherError(err: unknown): string {
   const msg = String((err as Error)?.message ?? '');
   if (/duplicate key|teachers_pkey/i.test(msg)) return 'This account already has a teacher profile.';
   if (/experience_years/i.test(msg)) return `Experience must be between 0 and ${EXPERIENCE_MAX} years.`;
+  if (/achievements|authored_books/i.test(msg)) {
+    return `Each list holds up to ${LIST_MAX_ITEMS} items of ${LIST_ITEM_MIN}–${LIST_ITEM_MAX} characters.`;
+  }
   if (/network|fetch/i.test(msg)) return 'No connection. Check your internet and try again.';
   return msg || 'Something went wrong. Please try again.';
 }
