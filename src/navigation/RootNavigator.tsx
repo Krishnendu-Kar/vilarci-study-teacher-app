@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import { Platform } from 'react-native';
 import { DarkTheme, DefaultTheme, NavigationContainer, Theme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator, NativeStackNavigationOptions } from '@react-navigation/native-stack';
@@ -16,9 +16,6 @@ import { MoreScreen } from '../screens/MoreScreen';
 import { HonoursLogScreen } from '../screens/HonoursLogScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { HelpScreen } from '../screens/HelpScreen';
-import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
-import { OnboardingScreen } from '../screens/auth/OnboardingScreen';
-import { useAuth } from '../lib/AuthProvider';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -104,19 +101,6 @@ function navTheme(isDark: boolean, colors: ReturnType<typeof useTheme>['colors']
 
 export function RootNavigator() {
   const { colors, isDark } = useTheme();
-  const { session, loading, needsOnboarding, demo } = useAuth();
-
-  if (loading) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bgApp }}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
-  }
-
-  // Signed out → "Continue with Vilarci"; first visit → create the teacher profile.
-  if (!session && !demo) return <WelcomeScreen />;
-  if (needsOnboarding) return <OnboardingScreen />;
 
   return (
     <NavigationContainer theme={navTheme(isDark, colors)}>
