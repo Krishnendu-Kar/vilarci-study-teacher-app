@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Vilarci Teacher",
+    "slug": "vilarci-study-teacher-app",
+    "scheme": "vilarciteacher",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#fefefe",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "in.vilarci.teacher"
+    },
+    "android": {
+      "package": "in.vilarci.teacher",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
