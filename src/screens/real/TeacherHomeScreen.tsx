@@ -7,6 +7,7 @@ import { useTheme } from '../../theme/ThemeProvider';
 import { elevation, radius, spacing } from '../../theme/tokens';
 import { accountName, accountWhatsapp, useAuth } from '../../lib/AuthProvider';
 import { describeTeacherError, useTeacherProfile } from '../../lib/api/teacherProfile';
+import { usePrivateBatches } from '../../lib/api/privateBatches';
 import { AppText, Avatar, Card, Divider, HeroCard, IconName, KeyValue, Pill, Row, SectionHeader } from '../../components/ui/base';
 import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
@@ -14,7 +15,7 @@ import { Screen } from '../../components/ui/Screen';
 /** Teacher features that still live only in the demo. */
 const COMING_NEXT: { icon: IconName; title: string }[] = [
   { icon: 'business-outline', title: 'Institutes & invite codes' },
-  { icon: 'albums-outline', title: 'Batches & students' },
+  { icon: 'person-add-outline', title: 'Students joining batches' },
   { icon: 'checkmark-done-outline', title: 'Attendance & check-in codes' },
   { icon: 'document-text-outline', title: 'Tests, marks & homework' },
   { icon: 'wallet-outline', title: 'Fees' },
@@ -30,6 +31,8 @@ export function TeacherHomeScreen() {
   const navigation = useNavigation<any>();
   const { session, profile, enterDemo } = useAuth();
   const teacher = useTeacherProfile();
+  const batches = usePrivateBatches();
+  const batchCount = batches.data?.length ?? 0;
 
   const name = accountName(profile, session);
   const initials = `${profile?.first_name?.[0] ?? name[0] ?? 'V'}${profile?.last_name?.[0] ?? ''}`.toUpperCase();
@@ -154,6 +157,57 @@ export function TeacherHomeScreen() {
             </Card>
           )}
         </View>
+
+        {/* ── Private batches ───────────────────────────────────────────── */}
+        {t ? (
+          <View style={{ marginTop: spacing.xxl }}>
+            <SectionHeader
+              title="Private batches"
+              subtitle={batchCount ? `${batchCount} batch${batchCount === 1 ? '' : 'es'}` : 'Your own tuition batches'}
+              action={batchCount ? 'View all' : undefined}
+              onAction={() => navigation.navigate('Batches')}
+            />
+            <Card>
+              {batchCount ? (
+                <View style={{ gap: spacing.sm }}>
+                  {(batches.data ?? []).slice(0, 3).map((b) => (
+                    <Pressable
+                      key={b.id}
+                      onPress={() => navigation.navigate('Batches', { screen: 'BatchDetail', params: { id: b.id }, initial: false })}
+                      style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                    >
+                      <Row gap={spacing.md}>
+                        <Ionicons name="people-outline" size={18} color={colors.primary} />
+                        <View style={{ flex: 1 }}>
+                          <AppText variant="bodyStrong" numberOfLines={1}>
+                            {b.name}
+                          </AppText>
+                          <AppText variant="caption" tone="muted" numberOfLines={1}>
+                            {b.grade} · {b.subject}
+                          </AppText>
+                        </View>
+                        <Pill label={b.join_code} tone="success" />
+                      </Row>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : (
+                <AppText variant="caption" tone="muted">
+                  Create a batch for each timing you teach. Students join with its code.
+                </AppText>
+              )}
+              <Button
+                label={batchCount ? 'Manage batches' : 'Create a batch'}
+                iconName={batchCount ? 'arrow-forward' : 'add-circle-outline'}
+                variant={batchCount ? 'secondary' : 'primary'}
+                size="sm"
+                fullWidth
+                onPress={() => navigation.navigate('Batches', batchCount ? undefined : { screen: 'BatchForm', initial: false })}
+                style={{ marginTop: spacing.md }}
+              />
+            </Card>
+          </View>
+        ) : null}
 
         {/* ── Build progress ────────────────────────────────────────────── */}
         <View style={{ marginTop: spacing.xxl }}>

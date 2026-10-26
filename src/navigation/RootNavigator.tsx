@@ -14,6 +14,11 @@ import { ForgotPasswordScreen } from '../screens/auth/ForgotPasswordScreen';
 import { TeacherHomeScreen } from '../screens/real/TeacherHomeScreen';
 import { TeacherProfileFormScreen } from '../screens/real/TeacherProfileFormScreen';
 import { AccountScreen } from '../screens/real/AccountScreen';
+import { BatchesScreen as RealBatchesScreen } from '../screens/real/BatchesScreen';
+import { BatchFormScreen } from '../screens/real/BatchFormScreen';
+import { BatchDetailScreen } from '../screens/real/BatchDetailScreen';
+import { ComingSoonScreen, InstitutesComingSoon } from '../screens/real/ComingSoonScreen';
+import { MoreScreen as RealMoreScreen } from '../screens/real/MoreScreen';
 
 import { TodayScreen } from '../screens/TodayScreen';
 import { BatchesScreen } from '../screens/BatchesScreen';
@@ -33,7 +38,47 @@ const BatchesStack = createNativeStackNavigator();
 const InstitutesStack = createNativeStackNavigator();
 const MoreStack = createNativeStackNavigator();
 const AuthStack = createNativeStackNavigator();
-const RealStack = createNativeStackNavigator();
+const RealTabs = createBottomTabNavigator();
+const RealHomeStack = createNativeStackNavigator();
+const RealBatchesStack = createNativeStackNavigator();
+const RealMoreStack = createNativeStackNavigator();
+
+function RealHomeNavigator() {
+  return (
+    <RealHomeStack.Navigator screenOptions={pushOptions}>
+      <RealHomeStack.Screen name="TeacherHome" component={TeacherHomeScreen} />
+      <RealHomeStack.Screen name="TeacherProfileForm" component={TeacherProfileFormScreen} />
+      <RealHomeStack.Screen name="Account" component={AccountScreen} />
+    </RealHomeStack.Navigator>
+  );
+}
+
+function RealBatchesNavigator() {
+  return (
+    <RealBatchesStack.Navigator screenOptions={pushOptions}>
+      <RealBatchesStack.Screen name="BatchList" component={RealBatchesScreen} />
+      <RealBatchesStack.Screen name="BatchForm" component={BatchFormScreen} />
+      <RealBatchesStack.Screen name="BatchDetail" component={BatchDetailScreen} />
+    </RealBatchesStack.Navigator>
+  );
+}
+
+function RealMoreNavigator() {
+  return (
+    <RealMoreStack.Navigator screenOptions={pushOptions}>
+      <RealMoreStack.Screen name="MoreHub" component={RealMoreScreen} />
+      <RealMoreStack.Screen name="Account" component={AccountScreen} />
+      <RealMoreStack.Screen name="ComingSoon" component={ComingSoonScreen} />
+    </RealMoreStack.Navigator>
+  );
+}
+
+const REAL_TAB_ICONS: Record<string, [IconName, IconName]> = {
+  Home: ['home', 'home-outline'],
+  Batches: ['people', 'people-outline'],
+  Institutes: ['business', 'business-outline'],
+  More: ['grid', 'grid-outline'],
+};
 
 /** Drill-in screens: the deck and institute workspaces slide over their hub. */
 const pushOptions: NativeStackNavigationOptions = {
@@ -138,11 +183,30 @@ export function RootNavigator() {
   if (session && !demo) {
     return (
       <NavigationContainer theme={navTheme(isDark, colors)}>
-        <RealStack.Navigator screenOptions={pushOptions}>
-          <RealStack.Screen name="TeacherHome" component={TeacherHomeScreen} />
-          <RealStack.Screen name="TeacherProfileForm" component={TeacherProfileFormScreen} />
-          <RealStack.Screen name="Account" component={AccountScreen} />
-        </RealStack.Navigator>
+        <RealTabs.Navigator
+          screenOptions={({ route }) => ({
+            headerShown: false,
+            tabBarActiveTintColor: colors.primary,
+            tabBarInactiveTintColor: colors.textMuted,
+            tabBarStyle: {
+              backgroundColor: colors.surface,
+              borderTopColor: colors.border,
+              height: Platform.OS === 'ios' ? 84 : 62,
+              paddingTop: 6,
+              paddingBottom: Platform.OS === 'ios' ? 26 : 8,
+            },
+            tabBarLabelStyle: { fontFamily: fonts.sansSemibold, fontSize: 10.5 },
+            tabBarIcon: ({ color, size, focused }) => {
+              const [active, idle] = REAL_TAB_ICONS[route.name] ?? ['ellipse', 'ellipse-outline'];
+              return <Ionicons name={focused ? active : idle} size={size - 2} color={color} />;
+            },
+          })}
+        >
+          <RealTabs.Screen name="Home" component={RealHomeNavigator} />
+          <RealTabs.Screen name="Batches" component={RealBatchesNavigator} />
+          <RealTabs.Screen name="Institutes" component={InstitutesComingSoon} />
+          <RealTabs.Screen name="More" component={RealMoreNavigator} />
+        </RealTabs.Navigator>
       </NavigationContainer>
     );
   }
