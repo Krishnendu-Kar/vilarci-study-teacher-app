@@ -18,6 +18,7 @@ import 'react-native-url-polyfill/auto';
 
 import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
 import { ToastProvider } from './src/components/ui/Toast';
+import { AuthProvider } from './src/lib/AuthProvider';
 import { RootNavigator } from './src/navigation/RootNavigator';
 
 const queryClient = new QueryClient({
@@ -38,9 +39,11 @@ export default function App() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <ToastProvider>
-            <AppShell ready={fontsLoaded} />
-          </ToastProvider>
+          <AuthProvider>
+            <ToastProvider>
+              <AppShell ready={fontsLoaded} />
+            </ToastProvider>
+          </AuthProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

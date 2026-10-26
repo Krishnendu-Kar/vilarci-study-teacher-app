@@ -4,12 +4,15 @@ import { useTheme } from '../theme/ThemeProvider';
 import { spacing } from '../theme/tokens';
 import { useAppStore, type ThemeMode } from '../lib/store/useAppStore';
 import { useTeacher } from '../lib/api/hooks';
-import { AppText, Card, KeyValue, ListRow, Row, SectionHeader } from '../components/ui/base';
+import { AppText, Card, Divider, KeyValue, ListRow, Row, SectionHeader } from '../components/ui/base';
 import { Button } from '../components/ui/Button';
 import { Screen } from '../components/ui/Screen';
 import { Segmented } from '../components/ui/Segmented';
 import { useToast } from '../components/ui/Toast';
 import { ScreenTitle } from '../components/ScreenTitle';
+import * as WebBrowser from 'expo-web-browser';
+import { accountName, accountPhone, useAuth } from '../lib/AuthProvider';
+import { MANAGE_ACCOUNT_URL, signOut } from '../lib/auth';
 
 const THEME_OPTIONS = [
   { value: 'light', label: 'Light', icon: 'sunny-outline' as const },
@@ -23,6 +26,8 @@ export function SettingsScreen() {
   const resetDemo = useAppStore((s) => s.resetDemo);
   const { toast } = useToast();
   const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
+  const { session, profile, demo, exitDemo } = useAuth();
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgApp }}>
@@ -37,6 +42,56 @@ export function SettingsScreen() {
             <KeyValue label="Qualification" value={teacher.qualification} />
             <KeyValue label="Phone" value={teacher.phone || '—'} />
             <KeyValue label="Email" value={teacher.email || '—'} />
+          </Card>
+        </View>
+
+        <View style={{ marginTop: spacing.xxl }}>
+          <SectionHeader title="Account" />
+          <Card>
+            {demo ? (
+              <ListRow
+                title="You’re exploring the demo"
+                subtitle="Continue with Vilarci to use your own classes"
+                iconName="log-in-outline"
+                onPress={exitDemo}
+              />
+            ) : (
+              <>
+                <KeyValue label="Vilarci account" value={accountName(profile, session)} />
+                <KeyValue label="Mobile" value={accountPhone(profile, session) ?? '—'} />
+                <Divider style={{ marginVertical: spacing.sm }} />
+                <ListRow
+                  title="Manage Vilarci account"
+                  subtitle="Name, number and password are managed on vilarci.in"
+                  iconName="open-outline"
+                  onPress={() => WebBrowser.openBrowserAsync(MANAGE_ACCOUNT_URL).catch(() => {})}
+                />
+                <Divider />
+                {confirmLogout ? (
+                  <View style={{ paddingVertical: spacing.sm }}>
+                    <AppText variant="subheading">Log out of Vilarci Teacher?</AppText>
+                    <Row gap={spacing.sm} style={{ marginTop: spacing.md }}>
+                      <Button label="Cancel" variant="secondary" size="sm" onPress={() => setConfirmLogout(false)} />
+                      <Button
+                        label="Log out"
+                        variant="danger"
+                        size="sm"
+                        iconName="log-out-outline"
+                        onPress={() => signOut().catch(() => toast('Couldn’t log out. Try again.', 'error'))}
+                      />
+                    </Row>
+                  </View>
+                ) : (
+                  <ListRow
+                    title="Log out"
+                    subtitle="Signs out of Vilarci Teacher on this phone only"
+                    iconName="log-out-outline"
+                    tint={colors.error}
+                    onPress={() => setConfirmLogout(true)}
+                  />
+                )}
+              </>
+            )}
           </Card>
         </View>
 
