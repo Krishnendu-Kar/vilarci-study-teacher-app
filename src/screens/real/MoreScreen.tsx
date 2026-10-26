@@ -10,6 +10,7 @@ import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
 import { useToast } from '../../components/ui/Toast';
 import { RealTopBar } from '../../components/real/RealTopBar';
+import { useTeacherProfile } from '../../lib/api/teacherProfile';
 
 const SOON: { title: string; icon: IconName }[] = [
   { title: 'Honours log', icon: 'trophy-outline' },
@@ -23,6 +24,7 @@ export function MoreScreen() {
   const navigation = useNavigation<any>();
   const toast = useToast();
   const { session, profile, enterDemo } = useAuth();
+  const { data: teacher } = useTeacherProfile();
   const [confirmLogout, setConfirmLogout] = useState(false);
   const name = accountName(profile, session);
   const initials = `${profile?.first_name?.[0] ?? name[0] ?? 'V'}${profile?.last_name?.[0] ?? ''}`.toUpperCase();
@@ -37,6 +39,13 @@ export function MoreScreen() {
             subtitle={profile?.email ?? profile?.whatsapp_number ?? 'Your Vilarci account'}
             onPress={() => navigation.navigate('Account')}
             right={<Avatar initials={initials} gradient={['#5a0812', '#8E1437']} size={40} />}
+          />
+          <Divider />
+          <ListRow
+            title="Teacher profile"
+            subtitle={teacher ? [teacher.primary_subject, teacher.qualification].filter(Boolean).join(' · ') : 'Not created yet'}
+            iconName="school-outline"
+            onPress={() => navigation.navigate('TeacherProfileForm')}
           />
         </Card>
 

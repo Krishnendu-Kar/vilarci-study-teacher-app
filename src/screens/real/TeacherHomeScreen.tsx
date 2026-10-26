@@ -1,14 +1,14 @@
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../../theme/ThemeProvider';
 import { elevation, radius, spacing } from '../../theme/tokens';
-import { accountName, accountWhatsapp, useAuth } from '../../lib/AuthProvider';
-import { describeTeacherError, useTeacherProfile } from '../../lib/api/teacherProfile';
+import { accountName, useAuth } from '../../lib/AuthProvider';
+import { useTeacherProfile } from '../../lib/api/teacherProfile';
 import { usePrivateBatches } from '../../lib/api/privateBatches';
-import { AppText, Avatar, Card, Divider, HeroCard, IconName, KeyValue, Pill, Row, SectionHeader } from '../../components/ui/base';
+import { AppText, Avatar, Card, HeroCard, IconName, Pill, Row, SectionHeader } from '../../components/ui/base';
 import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
 
@@ -91,72 +91,29 @@ export function TeacherHomeScreen() {
           </AppText>
         </HeroCard>
 
-        {/* ── Teacher profile ───────────────────────────────────────────── */}
-        <View style={{ marginTop: spacing.xxl }}>
-          <SectionHeader
-            title="Teacher profile"
-            subtitle="Shown to students and institutes"
-            action={t ? 'Edit' : undefined}
-            onAction={() => navigation.navigate('TeacherProfileForm')}
-          />
-          {teacher.isLoading ? (
-            <ActivityIndicator color={colors.primary} style={{ marginVertical: spacing.xl }} />
-          ) : teacher.isError ? (
-            <Card>
-              <AppText variant="caption" tone="error">
-                {describeTeacherError(teacher.error)}
-              </AppText>
-              <Button label="Try again" variant="secondary" size="sm" onPress={() => teacher.refetch()} style={{ marginTop: spacing.md }} />
-            </Card>
-          ) : t ? (
-            <Card>
+        {/* ── Only when there's no teacher profile yet (batches need one) ── */}
+        {!teacher.isLoading && !teacher.isError && !t ? (
+          <Pressable
+            onPress={() => navigation.navigate('TeacherProfileForm')}
+            accessibilityRole="button"
+            style={({ pressed }) => ({ marginTop: spacing.xl, opacity: pressed ? 0.85 : 1 })}
+          >
+            <Card accentColor={colors.gold}>
               <Row gap={spacing.md}>
-                <Avatar initials={initials} gradient={['#0F7A52', '#3DB385']} size={52} />
-                <View style={{ flex: 1 }}>
-                  <AppText variant="heading" numberOfLines={1}>
-                    {name}
-                  </AppText>
-                  <Row gap={6} style={{ marginTop: 3 }}>
-                    <Pill label={t.primary_subject || 'Subject not set'} tone="primary" />
-                    {t.experience_years !== null ? <Pill label={`${t.experience_years} yrs exp`} tone="gold" /> : null}
-                  </Row>
-                </View>
-              </Row>
-              <Divider style={{ marginVertical: spacing.md }} />
-              <KeyValue label="Qualification" value={t.qualification || '—'} />
-              <KeyValue label="WhatsApp" value={accountWhatsapp(profile, session) ?? '—'} />
-              <KeyValue label="Email" value={profile?.email ?? session?.user.email ?? '—'} />
-              {t.bio ? (
-                <AppText variant="body" tone="secondary" style={{ marginTop: spacing.md }}>
-                  {t.bio}
-                </AppText>
-              ) : null}
-              <ProfileList title="Achievements" icon="trophy" items={t.achievements} />
-              <ProfileList title="Authored books" icon="book" items={t.authored_books} />
-            </Card>
-          ) : (
-            <Card>
-              <Row gap={spacing.md} align="flex-start">
                 <View style={[styles.ctaIcon, { backgroundColor: colors.primarySubtle }]}>
-                  <Ionicons name="school-outline" size={22} color={colors.primary} />
+                  <Ionicons name="school-outline" size={20} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <AppText variant="subheading">Create your teacher profile</AppText>
-                  <AppText variant="caption" tone="muted" style={{ marginTop: 2 }}>
-                    Your subject, qualification and experience. One profile per account.
+                  <AppText variant="caption" tone="muted">
+                    Needed before you create batches.
                   </AppText>
                 </View>
+                <Ionicons name="chevron-forward" size={17} color={colors.textMuted} />
               </Row>
-              <Button
-                label="Create teacher profile"
-                iconName="add-circle-outline"
-                fullWidth
-                onPress={() => navigation.navigate('TeacherProfileForm')}
-                style={{ marginTop: spacing.lg }}
-              />
             </Card>
-          )}
-        </View>
+          </Pressable>
+        ) : null}
 
         {/* ── Private batches ───────────────────────────────────────────── */}
         {t ? (
@@ -230,28 +187,6 @@ export function TeacherHomeScreen() {
           </Card>
         </View>
       </Screen>
-    </View>
-  );
-}
-
-function ProfileList({ title, icon, items }: { title: string; icon: IconName; items: string[] }) {
-  const { colors } = useTheme();
-  if (!items?.length) return null;
-  return (
-    <View style={{ marginTop: spacing.lg }}>
-      <AppText variant="overline" tone="muted" style={{ marginBottom: spacing.sm }}>
-        {title.toUpperCase()}
-      </AppText>
-      <View style={{ gap: spacing.sm }}>
-        {items.map((item) => (
-          <Row key={item} gap={spacing.sm} align="flex-start">
-            <Ionicons name={icon} size={15} color={colors.gold} style={{ marginTop: 2 }} />
-            <AppText variant="bodyStrong" style={{ flex: 1 }}>
-              {item}
-            </AppText>
-          </Row>
-        ))}
-      </View>
     </View>
   );
 }

@@ -70,6 +70,7 @@ function RealMoreNavigator() {
     <RealMoreStack.Navigator screenOptions={pushOptions}>
       <RealMoreStack.Screen name="MoreHub" component={RealMoreScreen} />
       <RealMoreStack.Screen name="Account" component={AccountScreen} />
+      <RealMoreStack.Screen name="TeacherProfileForm" component={TeacherProfileFormScreen} />
       <RealMoreStack.Screen name="ComingSoon" component={ComingSoonScreen} />
     </RealMoreStack.Navigator>
   );
