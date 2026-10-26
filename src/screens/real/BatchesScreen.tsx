@@ -4,7 +4,14 @@ import { useNavigation } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../../theme/ThemeProvider';
 import { spacing } from '../../theme/tokens';
-import { BATCH_LIMITS, describeBatchError, PrivateBatchRow, usePrivateBatches } from '../../lib/api/privateBatches';
+import {
+  BATCH_LIMITS,
+  describeBatchError,
+  gradeBoardLabel,
+  PrivateBatchRow,
+  useBatchCounts,
+  usePrivateBatches,
+} from '../../lib/api/privateBatches';
 import { useTeacherProfile } from '../../lib/api/teacherProfile';
 import { summarizeSchedule } from '../../lib/utils/schedule';
 import { rupees } from '../../lib/utils/format';
@@ -19,6 +26,7 @@ export function BatchesScreen() {
   const navigation = useNavigation<any>();
   const teacher = useTeacherProfile();
   const batches = usePrivateBatches();
+  const counts = useBatchCounts();
   const list = batches.data ?? [];
   const atLimit = list.length >= BATCH_LIMITS.perTeacher;
 
@@ -29,7 +37,13 @@ export function BatchesScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgApp }}>
       <RealTopBar title="Private batches" right={newBatchButton} />
-      <Screen refreshing={batches.isRefetching} onRefresh={() => batches.refetch()}>
+      <Screen
+        refreshing={batches.isRefetching}
+        onRefresh={() => {
+          batches.refetch();
+          counts.refetch();
+        }}
+      >
         {teacher.isLoading || batches.isLoading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
         ) : !teacher.data ? (
@@ -75,7 +89,13 @@ export function BatchesScreen() {
               {atLimit ? ` · limit of ${BATCH_LIMITS.perTeacher} reached` : ''}
             </AppText>
             {list.map((b) => (
-              <BatchCard key={b.id} batch={b} onPress={() => navigation.navigate('BatchDetail', { id: b.id })} />
+              <BatchCard
+                key={b.id}
+                batch={b}
+                approved={counts.data?.[b.id]?.approved ?? 0}
+                pending={counts.data?.[b.id]?.pending ?? 0}
+                onPress={() => navigation.navigate('BatchDetail', { id: b.id })}
+              />
             ))}
           </View>
         )}
@@ -84,10 +104,20 @@ export function BatchesScreen() {
   );
 }
 
-export function BatchCard({ batch: b, onPress }: { batch: PrivateBatchRow; onPress: () => void }) {
+export function BatchCard({
+  batch: b,
+  approved,
+  pending,
+  onPress,
+}: {
+  batch: PrivateBatchRow;
+  approved: number;
+  pending: number;
+  onPress: () => void;
+}) {
   const { colors } = useTheme();
-  // Students join in the next step; until then every batch is empty.
-  const enrolled = 0;
+  const enrolled = approved;
+  const level = gradeBoardLabel(b);
   const fill = b.capacity ? (enrolled / b.capacity) * 100 : 0;
   return (
     <PressableCard level={1} onPress={onPress}>
@@ -95,8 +125,9 @@ export function BatchCard({ batch: b, onPress }: { batch: PrivateBatchRow; onPre
         <View style={{ flex: 1 }}>
           <AppText variant="heading">{b.name}</AppText>
           <Row gap={5} wrap style={{ marginTop: 6 }}>
-            <Pill label={`${b.grade} · ${b.board}`} tone="primary" />
-            <Pill label={b.subject} />
+            <Pill label={b.subject} tone="primary" />
+            {level ? <Pill label={level} /> : null}
+            {pending ? <Pill label={`${pending} request${pending === 1 ? '' : 's'}`} tone="gold" icon="person-add-outline" /> : null}
           </Row>
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
@@ -128,7 +159,7 @@ export function BatchCard({ batch: b, onPress }: { batch: PrivateBatchRow; onPre
             {enrolled} of {b.capacity} seats
           </AppText>
         </Row>
-        <ProgressBar value={fill} color={colors.primary} />
+        <ProgressBar value={fill} color={fill >= 90 ? colors.gold : colors.primary} />
       </View>
 
       <Row justify="space-between" style={{ marginTop: spacing.md }}>

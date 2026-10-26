@@ -5,13 +5,14 @@ import { useTheme } from '../../theme/ThemeProvider';
 import { spacing } from '../../theme/tokens';
 import {
   BATCH_LIMITS,
+  BATCH_SUBJECTS,
   BOARDS,
   describeBatchError,
   GRADES,
   usePrivateBatch,
   useSaveBatch,
 } from '../../lib/api/privateBatches';
-import { SUBJECTS, useTeacherProfile } from '../../lib/api/teacherProfile';
+import { useTeacherProfile } from '../../lib/api/teacherProfile';
 import { summarizeSchedule } from '../../lib/utils/schedule';
 import { AppText, Chip, Row, SectionHeader } from '../../components/ui/base';
 import { Button } from '../../components/ui/Button';
@@ -37,7 +38,7 @@ export function BatchFormScreen() {
   const save = useSaveBatch();
 
   const initialSubject = existing?.subject ?? teacher?.primary_subject ?? '';
-  const subjectKnown = SUBJECTS.includes(initialSubject);
+  const subjectKnown = BATCH_SUBJECTS.includes(initialSubject);
 
   const [name, setName] = useState(existing?.name ?? '');
   const [subject, setSubject] = useState<string | null>(initialSubject ? (subjectKnown ? initialSubject : OTHER) : null);
@@ -61,8 +62,6 @@ export function BatchFormScreen() {
     }
     const finalSubject = subject === OTHER ? otherSubject.trim() : subject ?? '';
     if (finalSubject.length < 2) e.subject = 'Choose the subject.';
-    if (!grade) e.grade = 'Choose the class.';
-    if (!board) e.board = 'Choose the board.';
     const feeNum = fee.trim() === '' ? 0 : Number(fee);
     if (!Number.isInteger(feeNum) || feeNum < 0 || feeNum > BATCH_LIMITS.feeMax) e.fee = 'Enter the monthly fee in rupees.';
     const capNum = Number(capacity);
@@ -80,8 +79,8 @@ export function BatchFormScreen() {
         input: {
           name: n,
           subject: finalSubject,
-          grade: grade!,
-          board: board!,
+          grade,
+          board,
           room: room.trim(),
           monthly_fee: feeNum,
           capacity: capNum,
@@ -116,7 +115,7 @@ export function BatchFormScreen() {
 
         <ChipGroup
           label="Subject"
-          options={[...SUBJECTS, OTHER]}
+          options={[...BATCH_SUBJECTS, OTHER]}
           value={subject}
           onChange={(v) => {
             setSubject(v);
@@ -140,6 +139,7 @@ export function BatchFormScreen() {
 
         <ChipGroup
           label="Class"
+          optional
           options={GRADES}
           value={grade}
           onChange={(v) => {
@@ -150,6 +150,7 @@ export function BatchFormScreen() {
         />
         <ChipGroup
           label="Board"
+          optional
           options={BOARDS}
           value={board}
           onChange={(v) => {
@@ -232,12 +233,15 @@ function ChipGroup({
   value,
   onChange,
   error,
+  optional,
 }: {
   label: string;
   options: string[];
   value: string | null;
-  onChange: (v: string) => void;
+  onChange: (v: string | null) => void;
   error?: string;
+  /** Adds a "Not needed" choice (null) — for music, art, yoga and play batches. */
+  optional?: boolean;
 }) {
   return (
     <View style={{ marginTop: spacing.xl }}>
@@ -245,6 +249,7 @@ function ChipGroup({
         {label.toUpperCase()}
       </AppText>
       <Row gap={spacing.sm} wrap>
+        {optional ? <Chip label="Not needed" selected={value === null} onPress={() => onChange(null)} /> : null}
         {options.map((o) => (
           <Chip key={o} label={o} selected={value === o} onPress={() => onChange(o)} />
         ))}

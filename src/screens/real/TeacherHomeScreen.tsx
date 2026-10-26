@@ -183,7 +183,7 @@ export function TeacherHomeScreen() {
                             {b.name}
                           </AppText>
                           <AppText variant="caption" tone="muted" numberOfLines={1}>
-                            {b.grade} · {b.subject}
+                            {[b.subject, b.grade, b.board].filter(Boolean).join(' · ')}
                           </AppText>
                         </View>
                         <Pill label={b.join_code} tone="success" />
