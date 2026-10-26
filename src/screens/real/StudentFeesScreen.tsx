@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -16,7 +17,7 @@ import {
   useUndoFee,
 } from '../../lib/api/batchFees';
 import { courseLabel, monthLabel } from '../../lib/utils/months';
-import { formatDate, rupees, todayIso } from '../../lib/utils/format';
+import { formatDate, formatDateLong, rupees, todayIso } from '../../lib/utils/format';
 import { AppText, Card, Chip, EmptyState, HeroCard, Pill, Row } from '../../components/ui/base';
 import { Button } from '../../components/ui/Button';
 import { FormField } from '../../components/ui/Field';
@@ -160,6 +161,12 @@ function Stat({ value, label, warn }: { value: string; label: string; warn?: boo
   );
 }
 
+/** "2026-10-27" → local Date (no UTC shift). */
+function isoToDate(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 function MonthSheet({
   month,
   membershipId,
@@ -171,13 +178,18 @@ function MonthSheet({
   fee: number;
   onClose: () => void;
 }) {
+  const { colors, isDark } = useTheme();
   const toast = useToast();
   const record = useRecordFee(membershipId);
   const undo = useUndoFee(membershipId);
   const [mode, setMode] = useState<PayMode>(month.row?.mode ?? 'upi');
   const [amount, setAmount] = useState(String(month.row?.status === 'paid' ? month.row.amount : fee));
   const [note, setNote] = useState(month.row?.note ?? '');
+  // Paid-on date: the saved one when editing, otherwise today; never in the future.
+  const [paidOn, setPaidOn] = useState(month.row?.paid_on ?? todayIso());
+  const [pickerOpen, setPickerOpen] = useState(false);
   const busy = record.isPending || undo.isPending;
+  const today = todayIso();
 
   const run = async (fn: () => Promise<void>, done: string) => {
     try {
@@ -196,7 +208,7 @@ function MonthSheet({
       return;
     }
     run(
-      () => record.mutateAsync({ month: month.month, status: 'paid', amount: amt, paid_on: month.row?.paid_on ?? todayIso(), mode, note: note.trim() }),
+      () => record.mutateAsync({ month: month.month, status: 'paid', amount: amt, paid_on: paidOn, mode, note: note.trim() }),
       `${monthLabel(month.month)} marked paid`,
     );
   };
@@ -213,6 +225,41 @@ function MonthSheet({
               <Chip key={m.value} label={m.label} selected={mode === m.value} onPress={() => setMode(m.value)} />
             ))}
           </Row>
+        </View>
+        <View style={{ gap: 6 }}>
+          <AppText variant="overline" tone="muted">
+            PAID ON
+          </AppText>
+          <Pressable
+            onPress={() => setPickerOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Paid on ${formatDateLong(paidOn)}. Change date`}
+            style={({ pressed }) => [styles.dateField, { borderColor: colors.border, backgroundColor: colors.surfaceMuted, opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Ionicons name="calendar-outline" size={17} color={colors.primary} />
+            <AppText variant="bodyStrong" style={{ flex: 1 }}>
+              {formatDateLong(paidOn)}
+            </AppText>
+            {paidOn === today ? <Pill label="Today" tone="primary" /> : null}
+            <Ionicons name="chevron-down" size={15} color={colors.textMuted} />
+          </Pressable>
+          {pickerOpen ? (
+            <DateTimePicker
+              value={isoToDate(paidOn)}
+              mode="date"
+              display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              maximumDate={isoToDate(today)}
+              themeVariant={isDark ? 'dark' : 'light'}
+              onValueChange={(_, d) => {
+                setPaidOn(todayIso(d));
+                if (Platform.OS === 'android') setPickerOpen(false);
+              }}
+              onDismiss={() => setPickerOpen(false)}
+            />
+          ) : null}
+          {pickerOpen && Platform.OS === 'ios' ? (
+            <Button label="Done" size="sm" variant="secondary" onPress={() => setPickerOpen(false)} />
+          ) : null}
         </View>
         <FormField
           label="Amount (₹)"
@@ -255,6 +302,15 @@ function MonthSheet({
 }
 
 const styles = StyleSheet.create({
+  dateField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 13,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
