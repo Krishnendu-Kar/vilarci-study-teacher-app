@@ -8,7 +8,7 @@ import { elevation, radius, spacing } from '../../theme/tokens';
 import { accountName, useAuth } from '../../lib/AuthProvider';
 import { useTeacherProfile } from '../../lib/api/teacherProfile';
 import { usePrivateBatches } from '../../lib/api/privateBatches';
-import { AppText, Avatar, Card, HeroCard, IconName, Pill, Row, SectionHeader } from '../../components/ui/base';
+import { AppText, Avatar, Card, IconName, Pill, Row, SectionHeader } from '../../components/ui/base';
 import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
 
@@ -79,24 +79,12 @@ export function TeacherHomeScreen() {
       </Row>
 
       <Screen refreshing={teacher.isRefetching} onRefresh={() => teacher.refetch()}>
-        <HeroCard>
-          <AppText variant="overline" style={{ color: colors.goldBright }}>
-            VILARCI TEACHER
-          </AppText>
-          <AppText variant="display" style={{ color: '#FDFBF9', marginTop: 2 }}>
-            Hi, {profile?.first_name || name.split(' ')[0]}
-          </AppText>
-          <AppText variant="caption" style={{ color: 'rgba(253,251,249,0.7)', marginTop: 2 }}>
-            {t ? `${t.primary_subject} educator · profile live` : 'Set up your teacher profile to get started.'}
-          </AppText>
-        </HeroCard>
-
         {/* ── Only when there's no teacher profile yet (batches need one) ── */}
         {!teacher.isLoading && !teacher.isError && !t ? (
           <Pressable
             onPress={() => navigation.navigate('TeacherProfileForm')}
             accessibilityRole="button"
-            style={({ pressed }) => ({ marginTop: spacing.xl, opacity: pressed ? 0.85 : 1 })}
+            style={({ pressed }) => ({ marginBottom: spacing.xl, opacity: pressed ? 0.85 : 1 })}
           >
             <Card accentColor={colors.gold}>
               <Row gap={spacing.md}>
@@ -117,7 +105,7 @@ export function TeacherHomeScreen() {
 
         {/* ── Private batches ───────────────────────────────────────────── */}
         {t ? (
-          <View style={{ marginTop: spacing.xxl }}>
+          <View style={{ marginBottom: spacing.xxl }}>
             <SectionHeader
               title="Private batches"
               subtitle={batchCount ? `${batchCount} batch${batchCount === 1 ? '' : 'es'}` : 'Your own tuition batches'}
@@ -167,7 +155,7 @@ export function TeacherHomeScreen() {
         ) : null}
 
         {/* ── Build progress ────────────────────────────────────────────── */}
-        <View style={{ marginTop: spacing.xxl }}>
+        <View>
           <SectionHeader title="Coming next" subtitle="Already designed — try them in the demo" />
           <Card>
             {COMING_NEXT.map((f, i) => (
