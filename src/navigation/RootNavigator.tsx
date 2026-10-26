@@ -1,11 +1,19 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DarkTheme, DefaultTheme, NavigationContainer, Theme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator, NativeStackNavigationOptions } from '@react-navigation/native-stack';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../theme/ThemeProvider';
-import { fonts } from '../theme/tokens';
+import { elevation, fonts } from '../theme/tokens';
+import { useAuth } from '../lib/AuthProvider';
+import { LoginScreen } from '../screens/auth/LoginScreen';
+import { SignupScreen } from '../screens/auth/SignupScreen';
+import { ForgotPasswordScreen } from '../screens/auth/ForgotPasswordScreen';
+import { TeacherHomeScreen } from '../screens/real/TeacherHomeScreen';
+import { TeacherProfileFormScreen } from '../screens/real/TeacherProfileFormScreen';
+import { AccountScreen } from '../screens/real/AccountScreen';
 
 import { TodayScreen } from '../screens/TodayScreen';
 import { BatchesScreen } from '../screens/BatchesScreen';
@@ -24,6 +32,8 @@ const TodayStack = createNativeStackNavigator();
 const BatchesStack = createNativeStackNavigator();
 const InstitutesStack = createNativeStackNavigator();
 const MoreStack = createNativeStackNavigator();
+const AuthStack = createNativeStackNavigator();
+const RealStack = createNativeStackNavigator();
 
 /** Drill-in screens: the deck and institute workspaces slide over their hub. */
 const pushOptions: NativeStackNavigationOptions = {
@@ -101,8 +111,44 @@ function navTheme(isDark: boolean, colors: ReturnType<typeof useTheme>['colors']
 
 export function RootNavigator() {
   const { colors, isDark } = useTheme();
+  const { session, loading, recovering, demo } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bgApp }}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  // Signed out (or mid password reset) → login / signup / reset.
+  if ((!session && !demo) || recovering) {
+    return (
+      <NavigationContainer theme={navTheme(isDark, colors)}>
+        <AuthStack.Navigator screenOptions={pushOptions}>
+          <AuthStack.Screen name="Login" component={LoginScreen} />
+          <AuthStack.Screen name="Signup" component={SignupScreen} />
+          <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+        </AuthStack.Navigator>
+      </NavigationContainer>
+    );
+  }
+
+  // Signed in → the real teacher app; the demo below opens from its Demo button.
+  if (session && !demo) {
+    return (
+      <NavigationContainer theme={navTheme(isDark, colors)}>
+        <RealStack.Navigator screenOptions={pushOptions}>
+          <RealStack.Screen name="TeacherHome" component={TeacherHomeScreen} />
+          <RealStack.Screen name="TeacherProfileForm" component={TeacherProfileFormScreen} />
+          <RealStack.Screen name="Account" component={AccountScreen} />
+        </RealStack.Navigator>
+      </NavigationContainer>
+    );
+  }
 
   return (
+    <>
     <NavigationContainer theme={navTheme(isDark, colors)}>
       <Tabs.Navigator
         screenOptions={({ route }) => ({
@@ -129,5 +175,37 @@ export function RootNavigator() {
         <Tabs.Screen name="More" component={MoreNavigator} />
       </Tabs.Navigator>
     </NavigationContainer>
+    {session ? <BackToAccountPill /> : null}
+    </>
+  );
+}
+
+/** Floating way back from the demo screens to the signed-in real app. */
+function BackToAccountPill() {
+  const { colors } = useTheme();
+  const { exitDemo } = useAuth();
+  const insets = useSafeAreaInsets();
+  return (
+    <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, right: 0, bottom: (Platform.OS === 'ios' ? 84 : 62) + insets.bottom + 10, alignItems: 'center' }}>
+      <Pressable
+        onPress={exitDemo}
+        accessibilityRole="button"
+        accessibilityLabel="Back to my account"
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          paddingHorizontal: 14,
+          paddingVertical: 9,
+          borderRadius: 999,
+          backgroundColor: colors.primary,
+          opacity: pressed ? 0.85 : 1,
+          ...elevation(2, colors.shadowColor, colors.shadowOpacity + 0.1),
+        })}
+      >
+        <Ionicons name="arrow-undo-outline" size={15} color="#fff" />
+        <Text style={{ color: '#fff', fontFamily: fonts.sansSemibold, fontSize: 12.5 }}>Demo · Back to my account</Text>
+      </Pressable>
+    </View>
   );
 }
