@@ -125,7 +125,7 @@ export function BatchDetailScreen() {
     setConfirmDelete(false);
     try {
       await remove.mutateAsync(b.id);
-      toast.toast('Batch deleted', 'info');
+      toast.toast('Batch deleted — restore it from Private batches', 'info');
       navigation.goBack();
     } catch (err) {
       toast.toast(describeBatchError(err), 'error');
@@ -368,7 +368,7 @@ export function BatchDetailScreen() {
       <ConfirmSheet
         visible={confirmDelete}
         title={`Delete “${b.name}”?`}
-        message="Students stop seeing it and the join link stops working. Needs the internet."
+        message="Students stop seeing it and the join link stops working. You can restore it later from Private batches — students, attendance and fees come back with it. Needs the internet."
         confirmLabel="Delete batch"
         onClose={() => setConfirmDelete(false)}
         onConfirm={doDelete}

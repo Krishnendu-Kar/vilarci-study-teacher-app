@@ -97,6 +97,47 @@ export function usePrivateBatches(): { data: Batch[]; isLoading: boolean } {
   return { data, isLoading };
 }
 
+export interface DeletedBatch {
+  id: string;
+  name: string;
+  /** When it was deleted (ms). */
+  deleted_at: number;
+  /** The phone's last copy of it, when there is one. */
+  batch: Batch | undefined;
+}
+
+/** Batches this account deleted (they can be restored), most recently deleted first. */
+export function useDeletedBatches(): DeletedBatch[] {
+  const teaching = useLocalStore((s) => s.account?.teaching);
+  const batches = useLocalStore((s) => s.batches);
+  return useMemo(
+    () =>
+      (teaching ?? [])
+        .filter((t) => t.deleted_at != null && t.role === 'owner')
+        .map((t) => ({ id: t.batch_id, name: t.name, deleted_at: t.deleted_at as number, batch: batches[t.batch_id] }))
+        .sort((a, b) => b.deleted_at - a.deleted_at),
+    [teaching, batches],
+  );
+}
+
+/** Undo a delete (online): the batch, its students and their history come back. */
+export function useRestoreBatch() {
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc('batch_restore', { p_batch_id: id });
+      if (error) throw error;
+      await requestSync();
+    },
+  });
+}
+
+export function describeRestoreError(err: unknown): string {
+  const msg = String((err as Error)?.message ?? '');
+  if (/at most 50 batches/i.test(msg)) return `You already have ${BATCH_LIMITS.perTeacher} batches. Delete one before restoring another.`;
+  if (/network|fetch|timed? ?out/i.test(msg)) return 'No connection. Restoring a batch needs the internet.';
+  return msg || 'Something went wrong. Please try again.';
+}
+
 /** One batch. */
 export function usePrivateBatch(id: string | undefined): { data: Batch | undefined; isLoading: boolean } {
   const isLoading = useLoading();

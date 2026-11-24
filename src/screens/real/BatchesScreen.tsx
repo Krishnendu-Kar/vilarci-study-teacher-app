@@ -1,15 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../../theme/ThemeProvider';
 import { spacing } from '../../theme/tokens';
-import { BATCH_LIMITS, gradeBoardLabel, PrivateBatchRow, useBatchCounts, usePrivateBatches } from '../../lib/api/privateBatches';
+import {
+  BATCH_LIMITS,
+  describeRestoreError,
+  gradeBoardLabel,
+  PrivateBatchRow,
+  useBatchCounts,
+  useDeletedBatches,
+  usePrivateBatches,
+  useRestoreBatch,
+} from '../../lib/api/privateBatches';
 import { useTeacherProfile } from '../../lib/api/teacherProfile';
 import { useRefresh } from '../../lib/sync/useRefresh';
 import { summarizeSchedule } from '../../lib/utils/schedule';
-import { money } from '../../lib/utils/format';
-import { AppText, Card, EmptyState, Pill, PressableCard, ProgressBar, Row } from '../../components/ui/base';
+import { formatDateLong, money, todayIso } from '../../lib/utils/format';
+import { AppText, Card, Divider, EmptyState, Pill, PressableCard, ProgressBar, Row, SectionHeader } from '../../components/ui/base';
+import { useToast } from '../../components/ui/Toast';
 import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
 import { RealTopBar } from '../../components/real/RealTopBar';
@@ -83,7 +93,70 @@ export function BatchesScreen() {
             ))}
           </View>
         )}
+
+        {/* Deleted batches stay restorable: students, attendance and fees come back with them. */}
+        {teacher.data ? <DeletedBatches atLimit={atLimit} /> : null}
       </Screen>
+    </View>
+  );
+}
+
+function DeletedBatches({ atLimit }: { atLimit: boolean }) {
+  const deleted = useDeletedBatches();
+  const restore = useRestoreBatch();
+  const toast = useToast();
+  const [restoring, setRestoring] = useState<string | null>(null);
+  if (!deleted.length) return null;
+
+  const onRestore = async (id: string, name: string) => {
+    setRestoring(id);
+    try {
+      await restore.mutateAsync(id);
+      toast.toast(`“${name}” is back — students see it again`, 'success');
+    } catch (err) {
+      toast.toast(describeRestoreError(err), 'error');
+    } finally {
+      setRestoring(null);
+    }
+  };
+
+  return (
+    <View style={{ marginTop: spacing.xxl }}>
+      <SectionHeader
+        title={`Deleted batches · ${deleted.length}`}
+        subtitle="Restore brings back the batch, its students, attendance and fees"
+      />
+      <Card padded={false}>
+        {deleted.map((d, i) => (
+          <View key={d.id}>
+            {i > 0 ? <Divider inset={spacing.lg} /> : null}
+            <Row gap={spacing.md} style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}>
+              <View style={{ flex: 1 }}>
+                <AppText variant="bodyStrong" numberOfLines={1}>
+                  {d.name}
+                </AppText>
+                <AppText variant="caption" tone="muted" numberOfLines={1}>
+                  {[d.batch?.subject, `Deleted ${formatDateLong(todayIso(new Date(d.deleted_at)))}`].filter(Boolean).join(' · ')}
+                </AppText>
+              </View>
+              <Button
+                label="Restore"
+                iconName="arrow-undo-outline"
+                variant="secondary"
+                size="sm"
+                disabled={atLimit || (restoring != null && restoring !== d.id)}
+                loading={restoring === d.id}
+                onPress={() => onRestore(d.id, d.name)}
+              />
+            </Row>
+          </View>
+        ))}
+      </Card>
+      <AppText variant="caption" tone="muted" style={{ marginTop: spacing.sm }}>
+        {atLimit
+          ? `You have ${BATCH_LIMITS.perTeacher} batches — delete one to restore another.`
+          : 'Restoring needs the internet. The join code stays the same.'}
+      </AppText>
     </View>
   );
 }
