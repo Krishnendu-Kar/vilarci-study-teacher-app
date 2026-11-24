@@ -8,6 +8,7 @@ import { fonts, radius, spacing } from '../theme/tokens';
 import { useMyBatches, useMyInstitutes, useTeacher } from '../lib/api/hooks';
 import { AppText, Avatar, CenterMark, Divider, Row } from './ui/base';
 import { AccountSheet, teacherGradient } from './AccountSheet';
+import { BrandMark } from './real/BrandMark';
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -122,9 +123,12 @@ function Sidebar({ visible, onClose, context }: { visible: boolean; onClose: () 
         {/* ── Educator identity ─────────────────────────────────────────────── */}
         <View style={{ paddingTop: insets.top + spacing.lg, paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}>
           <Row justify="space-between" align="flex-start">
-            <AppText variant="title">
-              Vilarci <AppText variant="title" tone="primary">Teacher</AppText>
-            </AppText>
+            <Row gap={spacing.sm}>
+              <BrandMark size={30} />
+              <AppText variant="title">
+                Vilarci <AppText variant="title" tone="primary">Teacher</AppText>
+              </AppText>
+            </Row>
             <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Close menu" style={styles.close}>
               <Ionicons name="close" size={20} color={colors.textSecondary} />
             </Pressable>

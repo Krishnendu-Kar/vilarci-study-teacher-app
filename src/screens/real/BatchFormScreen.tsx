@@ -48,7 +48,8 @@ export function BatchFormScreen() {
   const [grade, setGrade] = useState<string | null>(existing?.grade ?? null);
   const [board, setBoard] = useState<string | null>(existing?.board ?? null);
   const [room, setRoom] = useState(existing?.room ?? '');
-  const [fee, setFee] = useState(existing ? String(existing.monthly_fee) : '');
+  // The form takes whole rupees; the server keeps paise.
+  const [fee, setFee] = useState(existing ? String(Math.round(existing.monthly_fee / 100)) : '');
   const [capacity, setCapacity] = useState(existing ? String(existing.capacity) : '20');
   const [schedule, setSchedule] = useState(() => toDraft(existing?.weekly_schedule));
   const [courseStart, setCourseStart] = useState(existing?.course_start ?? currentMonth());
@@ -88,7 +89,7 @@ export function BatchFormScreen() {
           grade,
           board,
           room: room.trim(),
-          monthly_fee: feeNum,
+          monthly_fee: feeNum * 100,
           capacity: capNum,
           weekly_schedule: fromDraft(schedule),
           course_start: courseStart,

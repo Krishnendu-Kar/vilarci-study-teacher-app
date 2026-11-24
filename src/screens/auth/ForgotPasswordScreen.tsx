@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInputInstance, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../../theme/ThemeProvider';
@@ -39,7 +39,7 @@ export function ForgotPasswordScreen() {
   const navigation = useNavigation<any>();
   const toast = useToast();
   const { setRecovering } = useAuth();
-  const confirmRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInputInstance>(null);
 
   const [stage, setStage] = useState<Stage>('request');
   const [channel, setChannel] = useState<ResetChannel>('sms');

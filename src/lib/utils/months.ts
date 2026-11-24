@@ -1,11 +1,11 @@
-// Month arithmetic for course durations and fee ledgers. A month is stored and
-// passed around as its first day, "YYYY-MM-01".
+// Month arithmetic for course durations and fee ledgers. A month is "YYYY-MM",
+// the same as the server's.
 
 const SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function monthKey(year: number, monthIndex: number): string {
   const d = new Date(year, monthIndex, 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
 export function currentMonth(now = new Date()): string {
@@ -17,7 +17,7 @@ export function addMonths(key: string, delta: number): string {
   return monthKey(y, m - 1 + delta);
 }
 
-/** "2026-04-01" → "Apr 2026" */
+/** "2026-04" → "Apr 2026" */
 export function monthLabel(key: string): string {
   const [y, m] = key.split('-').map(Number);
   return `${SHORT[m - 1]} ${y}`;

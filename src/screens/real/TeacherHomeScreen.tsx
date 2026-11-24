@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -7,23 +7,18 @@ import { useTheme } from '../../theme/ThemeProvider';
 import { elevation, radius, spacing } from '../../theme/tokens';
 import { accountName, useAuth } from '../../lib/AuthProvider';
 import { useTeacherProfile } from '../../lib/api/teacherProfile';
-import { usePrivateBatches } from '../../lib/api/privateBatches';
-import { AppText, Avatar, Card, IconName, Pill, Row, SectionHeader } from '../../components/ui/base';
+import { useBatchCounts, usePrivateBatches } from '../../lib/api/privateBatches';
+import { useLocalStore } from '../../lib/local/store';
+import { useRefresh } from '../../lib/sync/useRefresh';
+import { AppText, Avatar, Card, EmptyState, Pill, Row, SectionHeader } from '../../components/ui/base';
 import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
-
-/** Teacher features that still live only in the demo. */
-const COMING_NEXT: { icon: IconName; title: string }[] = [
-  { icon: 'business-outline', title: 'Institutes & invite codes' },
-  { icon: 'person-add-outline', title: 'Students joining batches' },
-  { icon: 'checkmark-done-outline', title: 'Attendance & check-in codes' },
-  { icon: 'document-text-outline', title: 'Tests, marks & homework' },
-  { icon: 'wallet-outline', title: 'Fees' },
-];
+import { RealMenuButton } from '../../components/real/RealSideMenu';
+import { SyncBanner } from '../../components/real/SyncBanner';
 
 /**
- * Home of the real, database-connected teacher app: the account (public.users)
- * and its single teacher profile (public.teachers).
+ * Home of the real teacher app, read from the phone's copy: the account,
+ * its teacher profile and its batches.
  */
 export function TeacherHomeScreen() {
   const { colors } = useTheme();
@@ -32,7 +27,11 @@ export function TeacherHomeScreen() {
   const { session, profile, enterDemo } = useAuth();
   const teacher = useTeacherProfile();
   const batches = usePrivateBatches();
-  const batchCount = batches.data?.length ?? 0;
+  const counts = useBatchCounts();
+  const batchCount = batches.data.length;
+  const { refreshing, refresh } = useRefresh();
+  const syncing = useLocalStore((s) => s.syncing);
+  const noCopy = useLocalStore((s) => s.ready && !s.account);
 
   const name = accountName(profile, session);
   const initials = `${profile?.first_name?.[0] ?? name[0] ?? 'V'}${profile?.last_name?.[0] ?? ''}`.toUpperCase();
@@ -45,6 +44,7 @@ export function TeacherHomeScreen() {
         gap={spacing.md}
         style={{ paddingTop: insets.top + spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}
       >
+        <RealMenuButton />
         <Pressable
           onPress={() => navigation.navigate('Account')}
           accessibilityRole="button"
@@ -78,7 +78,22 @@ export function TeacherHomeScreen() {
         </Pressable>
       </Row>
 
-      <Screen refreshing={teacher.isRefetching} onRefresh={() => teacher.refetch()}>
+      <Screen refreshing={refreshing} onRefresh={refresh}>
+        <SyncBanner />
+
+        {/* ── A new phone that hasn't reached the server yet ─────────────── */}
+        {noCopy ? (
+          syncing ? (
+            <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
+          ) : (
+            <EmptyState
+              icon="cloud-download-outline"
+              title="Connect to the internet once"
+              message="Your batches and students download to this phone the first time. After that they open even without internet."
+            />
+          )
+        ) : null}
+
         {/* ── Only when there's no teacher profile yet (batches need one) ── */}
         {!teacher.isLoading && !teacher.isError && !t ? (
           <Pressable
@@ -115,7 +130,9 @@ export function TeacherHomeScreen() {
             <Card>
               {batchCount ? (
                 <View style={{ gap: spacing.sm }}>
-                  {(batches.data ?? []).slice(0, 3).map((b) => (
+                  {batches.data.slice(0, 3).map((b) => {
+                    const pending = counts[b.id]?.pending ?? 0;
+                    return (
                     <Pressable
                       key={b.id}
                       onPress={() => navigation.navigate('Batches', { screen: 'BatchDetail', params: { id: b.id }, initial: false })}
@@ -131,10 +148,15 @@ export function TeacherHomeScreen() {
                             {[b.subject, b.grade, b.board].filter(Boolean).join(' · ')}
                           </AppText>
                         </View>
-                        <Pill label={b.join_code} tone="success" />
+                        {pending ? (
+                          <Pill label={`${pending} request${pending === 1 ? '' : 's'}`} tone="gold" icon="person-add-outline" />
+                        ) : (
+                          <Pill label={b.join_code} tone="success" />
+                        )}
                       </Row>
                     </Pressable>
-                  ))}
+                    );
+                  })}
                 </View>
               ) : (
                 <AppText variant="caption" tone="muted">
@@ -153,27 +175,6 @@ export function TeacherHomeScreen() {
             </Card>
           </View>
         ) : null}
-
-        {/* ── Build progress ────────────────────────────────────────────── */}
-        <View>
-          <SectionHeader title="Coming next" subtitle="Already designed — try them in the demo" />
-          <Card>
-            {COMING_NEXT.map((f, i) => (
-              <Row
-                key={f.title}
-                gap={spacing.md}
-                style={{ paddingVertical: spacing.sm, borderTopWidth: i ? StyleSheet.hairlineWidth : 0, borderTopColor: colors.border }}
-              >
-                <Ionicons name={f.icon} size={18} color={colors.textMuted} />
-                <AppText variant="bodyStrong" tone="secondary" style={{ flex: 1 }}>
-                  {f.title}
-                </AppText>
-                <Pill label="Demo" tone="neutral" />
-              </Row>
-            ))}
-            <Button label="Open the demo" variant="secondary" size="sm" iconName="play-circle-outline" fullWidth onPress={enterDemo} style={{ marginTop: spacing.md }} />
-          </Card>
-        </View>
       </Screen>
     </View>
   );

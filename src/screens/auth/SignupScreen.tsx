@@ -8,7 +8,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
+  TextInputInstance,
   View,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -96,10 +96,10 @@ export function SignupScreen() {
   const [code, setCode] = useState('');
   const [resendIn, setResendIn] = useState(0);
 
-  const lastNameRef = useRef<TextInput>(null);
-  const middleRef = useRef<TextInput>(null);
-  const emailRef = useRef<TextInput>(null);
-  const confirmRef = useRef<TextInput>(null);
+  const lastNameRef = useRef<TextInputInstance>(null);
+  const middleRef = useRef<TextInputInstance>(null);
+  const emailRef = useRef<TextInputInstance>(null);
+  const confirmRef = useRef<TextInputInstance>(null);
 
   const step = STEPS[index];
   const isLast = index === STEPS.length - 1;

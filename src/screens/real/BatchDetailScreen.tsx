@@ -7,23 +7,28 @@ import { radius, spacing } from '../../theme/tokens';
 import {
   describeBatchError,
   describeMemberError,
+  feeFor,
   gradeBoardLabel,
   joinLinkFor,
   RosterRow,
+  studentName,
   useBatchRoster,
   useDecideRequest,
   useDeleteBatch,
   usePrivateBatch,
   useRemoveMember,
 } from '../../lib/api/privateBatches';
+import type { ContactCard } from '../../lib/local/types';
+import { useRefresh } from '../../lib/sync/useRefresh';
 import { DAY_KEYS, DAY_LABELS, isClosed } from '../../lib/utils/schedule';
-import { formatDateLong, rupees } from '../../lib/utils/format';
-import { courseLabel } from '../../lib/utils/months';
+import { formatDateLong, money, todayIso } from '../../lib/utils/format';
+import { courseLabel, monthLabel } from '../../lib/utils/months';
 import { AppText, Avatar, Card, Divider, EmptyState, HeroCard, KeyValue, Pill, Row, SectionHeader } from '../../components/ui/base';
 import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
 import { useToast } from '../../components/ui/Toast';
 import { RealTopBar } from '../../components/real/RealTopBar';
+import { SyncBanner } from '../../components/real/SyncBanner';
 
 const RELATION_LABELS: Record<string, string> = {
   self: 'Self',
@@ -33,7 +38,10 @@ const RELATION_LABELS: Record<string, string> = {
   teacher: 'Teacher',
 };
 
-/** One private batch: join link, requests to approve, students, timetable. */
+/** A millisecond time as "14 Oct 2026". */
+const dayOf = (ms: number) => formatDateLong(todayIso(new Date(ms)));
+
+/** One batch: join link, requests to approve, students, timetable. */
 export function BatchDetailScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation<any>();
@@ -41,9 +49,10 @@ export function BatchDetailScreen() {
   const toast = useToast();
   const { data: b, isLoading } = usePrivateBatch(id);
   const roster = useBatchRoster(id);
-  const decide = useDecideRequest(id);
-  const removeMember = useRemoveMember(id);
+  const decide = useDecideRequest();
+  const removeMember = useRemoveMember();
   const remove = useDeleteBatch();
+  const { refreshing, refresh } = useRefresh();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
@@ -66,7 +75,7 @@ export function BatchDetailScreen() {
     );
   }
 
-  const rows = roster.data ?? [];
+  const rows = roster.data;
   const requests = rows.filter((r) => r.status === 'pending');
   const members = rows.filter((r) => r.status === 'approved');
   const link = joinLinkFor(b.join_code);
@@ -80,9 +89,10 @@ export function BatchDetailScreen() {
     }).catch(() => {});
 
   const onDecide = async (r: RosterRow, approve: boolean) => {
+    const first = r.student_card.first_name;
     try {
       await decide.mutateAsync({ id: r.id, approve });
-      toast.toast(approve ? `${r.first_name} added to the batch` : `Request from ${r.first_name} declined`, approve ? 'success' : 'info');
+      toast.toast(approve ? `${first} added to the batch` : `Request from ${first} declined`, approve ? 'success' : 'info');
     } catch (err) {
       toast.toast(describeMemberError(err), 'error');
     }
@@ -92,7 +102,7 @@ export function BatchDetailScreen() {
     try {
       await removeMember.mutateAsync(r.id);
       setConfirmRemove(null);
-      toast.toast(`${r.first_name} removed from the batch`, 'info');
+      toast.toast(`${r.student_card.first_name} removed from the batch`, 'info');
     } catch (err) {
       toast.toast(describeMemberError(err), 'error');
     }
@@ -115,7 +125,8 @@ export function BatchDetailScreen() {
         title={b.name}
         right={<Button label="Edit" iconName="create-outline" size="sm" variant="secondary" onPress={() => navigation.navigate('BatchForm', { id: b.id })} />}
       />
-      <Screen refreshing={roster.isRefetching} onRefresh={() => roster.refetch()}>
+      <Screen refreshing={refreshing} onRefresh={refresh}>
+        <SyncBanner />
         {/* Join link */}
         <HeroCard>
           <AppText variant="overline" style={{ color: colors.goldBright }}>
@@ -145,7 +156,7 @@ export function BatchDetailScreen() {
                 <Card key={r.id} accentColor={colors.gold}>
                   <StudentLine row={r} />
                   <AppText variant="caption" tone="muted" style={{ marginTop: spacing.sm }}>
-                    Requested by {r.account_name} · {formatDateLong(r.requested_at.slice(0, 10))}
+                    Requested on {dayOf(r.requested_at)}
                   </AppText>
                   <Row gap={spacing.sm} style={{ marginTop: spacing.md }}>
                     <Button label="Decline" variant="secondary" size="sm" onPress={() => onDecide(r, false)} style={{ flex: 1 }} fullWidth />
@@ -168,9 +179,9 @@ export function BatchDetailScreen() {
                 <View key={r.id} style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}>
                   {i > 0 ? <Divider style={{ marginBottom: spacing.md }} /> : null}
                   <Pressable
-                    onPress={() => navigation.navigate('StudentFees', { batchId: b.id, membershipId: r.id })}
+                    onPress={() => navigation.navigate('StudentFees', { batchId: b.id, enrolmentId: r.id })}
                     accessibilityRole="button"
-                    accessibilityLabel={`${r.first_name}'s fees`}
+                    accessibilityLabel={`${r.student_card.first_name}'s fees`}
                     style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
                   >
                     <Row gap={spacing.sm}>
@@ -188,8 +199,8 @@ export function BatchDetailScreen() {
                   </Pressable>
                   <Row justify="space-between" style={{ marginTop: spacing.sm }}>
                     <AppText variant="caption" tone="muted" style={{ flex: 1 }} numberOfLines={1}>
-                      {r.account_name}
-                      {r.account_whatsapp ? ` · ${r.account_whatsapp}` : ''}
+                      {contactLine(r.contact)}
+                      {r.fee_override != null ? ` · ${money(feeFor(r, b))}/month` : ''}
                     </AppText>
                     {confirmRemove === r.id ? (
                       <Row gap={spacing.sm}>
@@ -223,11 +234,11 @@ export function BatchDetailScreen() {
             {level ? <Pill label={level} /> : null}
           </Row>
           <Divider style={{ marginVertical: spacing.md }} />
-          <KeyValue label="Monthly fee" value={`${rupees(b.monthly_fee)} / month`} />
+          <KeyValue label="Monthly fee" value={`${money(b.monthly_fee)} / month`} />
           <KeyValue label="Course" value={courseLabel(b.course_start, b.course_end) ?? 'Not set — tap Edit'} />
           <KeyValue label="Seats" value={`${members.length} of ${b.capacity} filled`} />
           {b.room ? <KeyValue label="Room / venue" value={b.room} /> : null}
-          <KeyValue label="Created" value={formatDateLong(b.created_at.slice(0, 10))} />
+          <KeyValue label="Created" value={dayOf(b.created_at)} />
         </Card>
 
         {/* Timetable */}
@@ -262,7 +273,7 @@ export function BatchDetailScreen() {
                 Delete “{b.name}”?
               </AppText>
               <AppText variant="caption" style={{ color: colors.errorText, marginTop: 2 }}>
-                Students are removed and the join link stops working. This can’t be undone.
+                Students stop seeing it and the join link stops working. Needs the internet.
               </AppText>
               <Row gap={spacing.sm} style={{ marginTop: spacing.md }}>
                 <Button label="Cancel" variant="secondary" size="sm" onPress={() => setConfirmDelete(false)} />
@@ -279,22 +290,32 @@ export function BatchDetailScreen() {
 }
 
 function StudentLine({ row: r }: { row: RosterRow }) {
-  const name = [r.first_name, r.middle_name, r.last_name].filter((s) => s && s.trim()).join(' ');
-  const initials = `${r.first_name[0] ?? ''}${r.last_name[0] ?? ''}`.toUpperCase() || '?';
-  const relation = r.relation === 'other' ? r.relation_other ?? 'Other' : RELATION_LABELS[r.relation] ?? r.relation;
+  const c = r.student_card;
+  const initials = `${c.first_name[0] ?? ''}${c.last_name[0] ?? ''}`.toUpperCase() || '?';
   return (
     <Row gap={spacing.md}>
       <Avatar initials={initials} gradient={['#1E5AA8', '#4F8FE0']} size={40} />
       <View style={{ flex: 1 }}>
         <AppText variant="subheading" numberOfLines={1}>
-          {name}
+          {studentName(r)}
         </AppText>
         <AppText variant="caption" tone="muted" numberOfLines={1}>
-          {[r.class_name, r.relation === 'self' ? 'Joined for self' : `Added by ${relation}`].filter(Boolean).join(' · ')}
+          {[c.class_name, c.board, r.joined_month && r.status === 'approved' ? `Since ${monthLabel(r.joined_month)}` : null]
+            .filter(Boolean)
+            .join(' · ') || 'Student'}
         </AppText>
       </View>
     </Row>
   );
+}
+
+/** "Father · Ravi Sen · +91 98…" for the first guardian, "+1" for more. */
+function contactLine(contact: ContactCard[] | null): string {
+  const first = contact?.[0];
+  if (!first) return 'No contact shared';
+  const relation = first.relation === 'other' ? first.relation_other ?? 'Guardian' : RELATION_LABELS[first.relation] ?? first.relation;
+  const more = contact!.length > 1 ? ` +${contact!.length - 1}` : '';
+  return [relation, first.name, first.whatsapp].filter(Boolean).join(' · ') + more;
 }
 
 const styles = StyleSheet.create({

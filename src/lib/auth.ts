@@ -5,6 +5,8 @@
 // is ever switched on in Supabase, every call here must pass a captchaToken.
 import { AppState } from 'react-native';
 import { supabase } from './supabase';
+import { useLocalStore } from './local/store';
+import { requestSync } from './sync/engine';
 
 // Keep tokens fresh only while the app is in the foreground (supabase-js RN guidance).
 AppState.addEventListener('change', (state) => {
@@ -181,6 +183,17 @@ export async function saveNewPassword(password: string) {
   }
 }
 
+/**
+ * Logging out deletes the phone's copy, so edits that haven't reached the
+ * server yet are uploaded first; if they can't be, the teacher stays signed in.
+ */
 export async function signOut() {
+  if (useLocalStore.getState().pending) {
+    await requestSync();
+    const left = useLocalStore.getState().pending;
+    if (left) {
+      throw new Error(`${left} change${left === 1 ? ' hasn’t' : 's haven’t'} uploaded yet. Connect to the internet, then log out.`);
+    }
+  }
   await supabase.auth.signOut();
 }

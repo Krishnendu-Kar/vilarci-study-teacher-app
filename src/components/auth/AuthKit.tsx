@@ -1,5 +1,5 @@
 import React, { forwardRef, useRef, useState } from 'react';
-import { Pressable, StyleSheet, TextInput, TextInputProps, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, TextInput, TextInputInstance, TextInputProps, useWindowDimensions, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -137,7 +137,7 @@ export function AuthCard({ children }: { children: React.ReactNode }) {
 // ─── Text field ───────────────────────────────────────────────────────────────
 
 export const AuthField = forwardRef<
-  TextInput,
+  TextInputInstance,
   TextInputProps & {
     label: string;
     icon?: IconName;
@@ -292,7 +292,7 @@ export function OtpInput({
   error?: boolean;
 }) {
   const { colors } = useTheme();
-  const input = useRef<TextInput>(null);
+  const input = useRef<TextInputInstance>(null);
   const [focused, setFocused] = useState(true);
 
   return (

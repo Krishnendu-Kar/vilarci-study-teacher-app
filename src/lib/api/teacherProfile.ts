@@ -1,22 +1,14 @@
 // The signed-in account's teacher profile (public.teachers). One account = one
 // teacher: the row's primary key IS the account id, so a second profile can't
-// exist. Name, WhatsApp and email live on public.users, not here.
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+// exist. Name, WhatsApp and email live on public.users, not here. Read from
+// the phone's copy (the account snapshot); saved with the teacher_save action.
+import { useMutation } from '@tanstack/react-query';
 import { supabase } from '../supabase';
-import { useAuth } from '../AuthProvider';
+import { useLocalStore } from '../local/store';
+import type { TeacherProfile } from '../local/types';
+import { requestSync } from '../sync/engine';
 
-export interface TeacherProfile {
-  id: string;
-  qualification: string;
-  primary_subject: string;
-  experience_years: number | null;
-  bio: string;
-  avatar_url: string | null;
-  achievements: string[];
-  authored_books: string[];
-  created_at: string;
-  updated_at: string;
-}
+export type { TeacherProfile };
 
 export type TeacherProfileInput = Pick<
   TeacherProfile,
@@ -47,47 +39,30 @@ export const LIST_MAX_ITEMS = 10;
 export const LIST_ITEM_MIN = 3;
 export const LIST_ITEM_MAX = 120;
 
-const key = (accountId: string | undefined) => ['teacher-profile', accountId] as const;
-
-export function useTeacherProfile() {
-  const { session } = useAuth();
-  const accountId = session?.user.id;
-  return useQuery({
-    queryKey: key(accountId),
-    enabled: Boolean(accountId),
-    queryFn: async (): Promise<TeacherProfile | null> => {
-      const { data, error } = await supabase.from('teachers').select('*').eq('id', accountId!).maybeSingle();
-      if (error) throw error;
-      return (data as TeacherProfile | null) ?? null;
-    },
-  });
+/**
+ * The profile, null when there isn't one yet. isLoading until the phone's
+ * copy has come from the server once (a new phone), so "no profile" is never
+ * guessed.
+ */
+export function useTeacherProfile(): { data: TeacherProfile | null | undefined; isLoading: boolean; isError: boolean } {
+  const isLoading = useLocalStore((s) => !s.ready || !s.account);
+  const data = useLocalStore((s) => (s.account ? s.account.teacher : undefined));
+  return { data, isLoading, isError: false };
 }
 
-/** Creates the profile the first time, updates it afterwards. */
+/** Creates the profile the first time, updates it afterwards. Needs the internet. */
 export function useSaveTeacherProfile() {
-  const { session } = useAuth();
-  const accountId = session?.user.id;
-  const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ exists, input }: { exists: boolean; input: TeacherProfileInput }) => {
-      if (!accountId) throw new Error('Please log in again.');
-      const query = exists
-        ? supabase.from('teachers').update(input).eq('id', accountId)
-        : supabase.from('teachers').insert({ id: accountId, ...input });
-      const { error } = await query;
+    mutationFn: async ({ input }: { exists: boolean; input: TeacherProfileInput }) => {
+      const { error } = await supabase.rpc('teacher_save', { p_data: input });
       if (error) throw error;
+      await requestSync();
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: key(accountId) }),
   });
 }
 
 export function describeTeacherError(err: unknown): string {
   const msg = String((err as Error)?.message ?? '');
-  if (/duplicate key|teachers_pkey/i.test(msg)) return 'This account already has a teacher profile.';
-  if (/experience_years/i.test(msg)) return `Experience must be between 0 and ${EXPERIENCE_MAX} years.`;
-  if (/achievements|authored_books/i.test(msg)) {
-    return `Each list holds up to ${LIST_MAX_ITEMS} items of ${LIST_ITEM_MIN}–${LIST_ITEM_MAX} characters.`;
-  }
-  if (/network|fetch/i.test(msg)) return 'No connection. Check your internet and try again.';
+  if (/network|fetch|timed? ?out/i.test(msg)) return 'No connection. Check your internet and try again.';
   return msg || 'Something went wrong. Please try again.';
 }

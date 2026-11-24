@@ -4,7 +4,7 @@ This is **Vilarci Teacher**, the Expo/React Native educator app of the Vilarci S
 
 Expo ships breaking changes every SDK release. Before writing code that touches an Expo, EAS, or React Native API:
 
-1. Read the major version of the `expo` package in `package.json` (currently SDK 57).
+1. Read the major version of the `expo` package in `package.json` (currently SDK 58).
 2. Fetch the matching versioned docs: `https://docs.expo.dev/versions/v<major>.0.0/`
 3. For anything else, fetch https://docs.expo.dev/llms.txt and follow its links; never answer from memory.
 

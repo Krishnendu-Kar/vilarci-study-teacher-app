@@ -6,7 +6,7 @@ import { radius, spacing } from '../../theme/tokens';
 import { addMonths, monthLabel } from '../../lib/utils/months';
 import { AppText } from '../ui/base';
 
-/** ‹ Apr 2026 › month stepper. `min`/`max` are month keys ("YYYY-MM-01"). */
+/** ‹ Apr 2026 › month stepper. `min`/`max` are month keys ("YYYY-MM"). */
 export function MonthPicker({
   label,
   value,

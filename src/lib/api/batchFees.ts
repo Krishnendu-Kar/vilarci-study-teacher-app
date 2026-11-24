@@ -1,23 +1,16 @@
-// Per-student fee ledger for a private batch (public.batch_fees). One row per
-// recorded month (paid or waived); a missing month is due or upcoming. Only
-// the batch's teacher can write; the database checks the course range.
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../supabase';
+// Per-student fee ledger for a batch: the `fee` of each of the student's
+// months (public.enrolment_months, from the phone's copy). A month without one
+// is due (started) or upcoming. Recording a payment is saved on the phone and
+// uploaded by sync, so it works in class with no signal; the server checks the
+// course range and dates again.
+import { useLocalStore } from '../local/store';
+import type { EnrolmentMonth, FeeMode, MonthFee } from '../local/types';
+import { saveEdit } from '../sync/engine';
 import { currentMonth, monthsBetween } from '../utils/months';
+import { todayIso } from '../utils/format';
 
-export type FeeStatus = 'paid' | 'waived';
-export type PayMode = 'cash' | 'upi' | 'bank' | 'other';
-
-export interface FeeRow {
-  id: string;
-  membership_id: string;
-  month: string;
-  status: FeeStatus;
-  amount: number;
-  paid_on: string | null;
-  mode: PayMode | null;
-  note: string;
-}
+export type FeeStatus = MonthFee['status'];
+export type PayMode = FeeMode;
 
 export const PAY_MODES: { value: PayMode; label: string }[] = [
   { value: 'cash', label: 'Cash' },
@@ -31,73 +24,45 @@ export type LedgerState = 'paid' | 'waived' | 'due' | 'upcoming';
 export interface LedgerMonth {
   month: string;
   state: LedgerState;
-  row: FeeRow | null;
+  fee: MonthFee | null;
 }
 
-/** Course months with their state, plus totals for the summary card. */
-export function buildLedger(start: string, end: string, rows: FeeRow[], monthlyFee: number) {
+/** Course months with their state, plus totals for the summary card. Money in paise. */
+export function buildLedger(start: string, end: string, months: Record<string, EnrolmentMonth>, monthlyFee: number) {
   const now = currentMonth();
-  const byMonth = new Map(rows.map((r) => [r.month, r]));
-  const months: LedgerMonth[] = monthsBetween(start, end).map((m) => {
-    const row = byMonth.get(m) ?? null;
-    const state: LedgerState = row ? row.status : m <= now ? 'due' : 'upcoming';
-    return { month: m, state, row };
+  const list: LedgerMonth[] = monthsBetween(start, end).map((m) => {
+    const fee = months[m]?.fee ?? null;
+    const state: LedgerState = fee ? fee.status : m <= now ? 'due' : 'upcoming';
+    return { month: m, state, fee };
   });
-  const paid = months.reduce((s, m) => s + (m.state === 'paid' ? m.row!.amount : 0), 0);
-  const dueMonths = months.filter((m) => m.state === 'due').length;
+  const paid = list.reduce((s, m) => s + (m.state === 'paid' ? m.fee!.amount : 0), 0);
+  const dueMonths = list.filter((m) => m.state === 'due').length;
   return {
-    months,
-    totalCourse: months.length * monthlyFee,
+    months: list,
+    totalCourse: list.length * monthlyFee,
     paid,
-    waivedMonths: months.filter((m) => m.state === 'waived').length,
+    waivedMonths: list.filter((m) => m.state === 'waived').length,
     dueMonths,
     dueAmount: dueMonths * monthlyFee,
   };
 }
 
-const key = (membershipId: string) => ['batch-fees', membershipId] as const;
+const NO_MONTHS: Record<string, EnrolmentMonth> = {};
 
-export function useMemberFees(membershipId: string | undefined) {
-  return useQuery({
-    queryKey: key(membershipId ?? ''),
-    enabled: Boolean(membershipId),
-    queryFn: async (): Promise<FeeRow[]> => {
-      const { data, error } = await supabase.from('batch_fees').select('*').eq('membership_id', membershipId!).order('month');
-      if (error) throw error;
-      return (data ?? []) as FeeRow[];
-    },
-  });
+/** One student's months in a batch (month → row). */
+export function useEnrolmentMonths(enrolmentId: string | undefined): Record<string, EnrolmentMonth> {
+  return useLocalStore((s) => (enrolmentId ? s.months[enrolmentId] ?? NO_MONTHS : NO_MONTHS));
 }
 
-export function useRecordFee(membershipId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: Pick<FeeRow, 'month' | 'status' | 'amount' | 'paid_on' | 'mode' | 'note'>) => {
-      const { error } = await supabase
-        .from('batch_fees')
-        .upsert({ membership_id: membershipId, ...input }, { onConflict: 'membership_id,month' });
-      if (error) throw error;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: key(membershipId) }),
-  });
-}
-
-export function useUndoFee(membershipId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (month: string) => {
-      const { error } = await supabase.from('batch_fees').delete().eq('membership_id', membershipId).eq('month', month);
-      if (error) throw error;
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: key(membershipId) }),
-  });
+/** Record (or change) a month's fee; null puts it back to due. */
+export async function setMonthFee(batchId: string, enrolmentId: string, month: string, fee: MonthFee | null): Promise<void> {
+  if (fee?.status === 'paid' && fee.paid_on && fee.paid_on > todayIso()) {
+    throw new Error('The paid-on date can’t be in the future.');
+  }
+  await saveEdit({ t: 'enrolment_months', b: batchId, e: enrolmentId, m: month, patch: { fee } });
 }
 
 export function describeFeeError(err: unknown): string {
   const msg = String((err as Error)?.message ?? '');
-  if (/outside the course/i.test(msg)) return 'That month is outside the course.';
-  if (/course duration/i.test(msg)) return 'Set the course duration for this batch first (Edit batch).';
-  if (/approved students/i.test(msg)) return 'Accept the student into the batch first.';
-  if (/network|fetch/i.test(msg)) return 'No connection. Check your internet and try again.';
   return msg || 'Something went wrong. Please try again.';
 }

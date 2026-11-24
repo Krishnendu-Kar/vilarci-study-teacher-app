@@ -1,20 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './supabase';
+import { useLocalStore } from './local/store';
+import type { AccountMe } from './local/types';
+import { requestSync } from './sync/engine';
+import { useAccountData } from './sync/useAccountData';
 
 /** Account owner details — one row in public.users per login. */
-export interface AccountProfile {
-  id: string;
-  first_name: string;
-  middle_name: string;
-  last_name: string;
-  gender: 'male' | 'female' | 'other' | null;
-  whatsapp_number: string | null;
-  email: string | null;
-  dob: string | null;
-  created_at: string;
-  updated_at: string;
-}
+export type AccountProfile = AccountMe;
 
 interface AuthValue {
   session: Session | null;
@@ -38,7 +31,6 @@ const AuthContext = createContext<AuthValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<AccountProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [recovering, setRecovering] = useState(false);
   const [demo, setDemo] = useState(false);
@@ -65,20 +57,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const userId = session?.user.id;
-
-  const refreshProfile = useCallback(async () => {
-    if (!userId) {
-      setProfile(null);
-      return;
-    }
-    const { data, error } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
-    // A missing table or row is not fatal — the app falls back to the auth user.
-    setProfile(error ? null : (data as AccountProfile | null));
-  }, [userId]);
-
-  useEffect(() => {
-    refreshProfile();
-  }, [refreshProfile]);
+  // The phone's copy of this account: opened, synced and (on logout) deleted here.
+  useAccountData(userId);
+  const profile = useLocalStore((s) => (userId ? s.account?.me ?? null : null));
+  const refreshProfile = requestSync;
 
   const value = useMemo<AuthValue>(
     () => ({ session, profile, loading, recovering, setRecovering, demo, enterDemo, exitDemo, refreshProfile }),

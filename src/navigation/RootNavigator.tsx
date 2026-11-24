@@ -20,6 +20,8 @@ import { BatchDetailScreen } from '../screens/real/BatchDetailScreen';
 import { StudentFeesScreen } from '../screens/real/StudentFeesScreen';
 import { ComingSoonScreen, InstitutesComingSoon } from '../screens/real/ComingSoonScreen';
 import { MoreScreen as RealMoreScreen } from '../screens/real/MoreScreen';
+import { RealSideMenuProvider } from '../components/real/RealSideMenu';
+import { realNavigationRef } from './realNavigationRef';
 
 import { TodayScreen } from '../screens/TodayScreen';
 import { BatchesScreen } from '../screens/BatchesScreen';
@@ -185,7 +187,8 @@ export function RootNavigator() {
   // Signed in → the real teacher app; the demo below opens from its Demo button.
   if (session && !demo) {
     return (
-      <NavigationContainer theme={navTheme(isDark, colors)}>
+      <RealSideMenuProvider>
+      <NavigationContainer ref={realNavigationRef} theme={navTheme(isDark, colors)}>
         <RealTabs.Navigator
           screenOptions={({ route }) => ({
             headerShown: false,
@@ -211,6 +214,7 @@ export function RootNavigator() {
           <RealTabs.Screen name="More" component={RealMoreNavigator} />
         </RealTabs.Navigator>
       </NavigationContainer>
+      </RealSideMenuProvider>
     );
   }
 

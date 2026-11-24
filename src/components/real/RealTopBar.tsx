@@ -6,15 +6,19 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../../theme/ThemeProvider';
 import { spacing } from '../../theme/tokens';
 import { AppText, Row } from '../ui/base';
+import { RealMenuButton } from './RealSideMenu';
 
-/** Back chevron (when there is somewhere to go back to), title, optional right slot. */
+/** ☰, back (only inside a tab's stack, never on a tab's first screen), title, optional right slot. */
 export function RealTopBar({ title, right }: { title: string; right?: React.ReactNode }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const state = navigation.getState();
+  const showBack = state?.type === 'stack' && state.index > 0;
   return (
-    <Row gap={spacing.md} style={{ paddingTop: insets.top + spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>
-      {navigation.canGoBack() ? (
+    <Row gap={spacing.sm} style={{ paddingTop: insets.top + spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>
+      <RealMenuButton />
+      {showBack ? (
         <Pressable
           onPress={() => navigation.goBack()}
           hitSlop={10}
@@ -25,7 +29,7 @@ export function RealTopBar({ title, right }: { title: string; right?: React.Reac
           <Ionicons name="arrow-back" size={19} color={colors.textMain} />
         </Pressable>
       ) : null}
-      <AppText variant="title" style={{ flex: 1 }} numberOfLines={1}>
+      <AppText variant="title" style={{ flex: 1, marginLeft: spacing.xs }} numberOfLines={1}>
         {title}
       </AppText>
       {right}

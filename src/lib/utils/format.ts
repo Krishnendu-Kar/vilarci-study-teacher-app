@@ -23,6 +23,15 @@ export function rupees(amount: number, withSymbol = true): string {
   return `${sign}${withSymbol ? '₹' : ''}${grouped}`;
 }
 
+/** Paise (as the server stores money) → "₹1,500" or "₹1,500.50". */
+export function money(paise: number): string {
+  const sign = paise < 0 ? '-' : '';
+  const abs = Math.abs(Math.round(paise));
+  const whole = rupees(Math.floor(abs / 100));
+  const rest = abs % 100;
+  return `${sign}${whole}${rest ? `.${String(rest).padStart(2, '0')}` : ''}`;
+}
+
 export function compactNumber(n: number): string {
   return n.toLocaleString('en-IN');
 }

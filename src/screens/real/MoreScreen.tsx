@@ -83,7 +83,7 @@ export function MoreScreen() {
                       variant="danger"
                       size="sm"
                       iconName="log-out-outline"
-                      onPress={() => signOut().catch(() => toast.toast('Couldn’t log out. Try again.', 'error'))}
+                      onPress={() => signOut().catch((err) => toast.toast((err as Error)?.message || 'Couldn’t log out. Try again.', 'error'))}
                     />
                   </Row>
                 </View>

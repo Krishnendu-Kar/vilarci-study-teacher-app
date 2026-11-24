@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { RefreshControl, ScrollView, StyleProp, View, ViewStyle } from 'react-native';
+import { RefreshControl, ScrollView, ScrollViewInstance, StyleProp, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme/ThemeProvider';
 import { spacing } from '../../theme/tokens';
@@ -30,7 +30,7 @@ export function Screen({
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ y: 0, animated: false });

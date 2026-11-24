@@ -4,30 +4,26 @@ import { useNavigation } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../../theme/ThemeProvider';
 import { spacing } from '../../theme/tokens';
-import {
-  BATCH_LIMITS,
-  describeBatchError,
-  gradeBoardLabel,
-  PrivateBatchRow,
-  useBatchCounts,
-  usePrivateBatches,
-} from '../../lib/api/privateBatches';
+import { BATCH_LIMITS, gradeBoardLabel, PrivateBatchRow, useBatchCounts, usePrivateBatches } from '../../lib/api/privateBatches';
 import { useTeacherProfile } from '../../lib/api/teacherProfile';
+import { useRefresh } from '../../lib/sync/useRefresh';
 import { summarizeSchedule } from '../../lib/utils/schedule';
-import { rupees } from '../../lib/utils/format';
+import { money } from '../../lib/utils/format';
 import { AppText, Card, EmptyState, Pill, PressableCard, ProgressBar, Row } from '../../components/ui/base';
 import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
 import { RealTopBar } from '../../components/real/RealTopBar';
+import { SyncBanner } from '../../components/real/SyncBanner';
 
-/** Real private batches, newest first. */
+/** The teacher's batches from the phone's copy, newest first. */
 export function BatchesScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation<any>();
   const teacher = useTeacherProfile();
   const batches = usePrivateBatches();
   const counts = useBatchCounts();
-  const list = batches.data ?? [];
+  const { refreshing, refresh } = useRefresh();
+  const list = batches.data;
   const atLimit = list.length >= BATCH_LIMITS.perTeacher;
 
   const newBatchButton = teacher.data && list.length > 0 && !atLimit ? (
@@ -37,13 +33,8 @@ export function BatchesScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgApp }}>
       <RealTopBar title="Private batches" right={newBatchButton} />
-      <Screen
-        refreshing={batches.isRefetching}
-        onRefresh={() => {
-          batches.refetch();
-          counts.refetch();
-        }}
-      >
+      <Screen refreshing={refreshing} onRefresh={refresh}>
+        <SyncBanner />
         {teacher.isLoading || batches.isLoading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
         ) : !teacher.data ? (
@@ -59,13 +50,6 @@ export function BatchesScreen() {
               onPress={() => navigation.navigate('Home', { screen: 'TeacherProfileForm' })}
               style={{ marginTop: spacing.lg }}
             />
-          </Card>
-        ) : batches.isError ? (
-          <Card>
-            <AppText variant="caption" tone="error">
-              {describeBatchError(batches.error)}
-            </AppText>
-            <Button label="Try again" variant="secondary" size="sm" onPress={() => batches.refetch()} style={{ marginTop: spacing.md }} />
           </Card>
         ) : list.length === 0 ? (
           <View>
@@ -92,8 +76,8 @@ export function BatchesScreen() {
               <BatchCard
                 key={b.id}
                 batch={b}
-                approved={counts.data?.[b.id]?.approved ?? 0}
-                pending={counts.data?.[b.id]?.pending ?? 0}
+                approved={counts[b.id]?.approved ?? 0}
+                pending={counts[b.id]?.pending ?? 0}
                 onPress={() => navigation.navigate('BatchDetail', { id: b.id })}
               />
             ))}
@@ -164,7 +148,7 @@ export function BatchCard({
 
       <Row justify="space-between" style={{ marginTop: spacing.md }}>
         <AppText variant="bodyStrong">
-          {rupees(b.monthly_fee)}
+          {money(b.monthly_fee)}
           <AppText variant="caption" tone="muted">
             {' '}
             / month
