@@ -58,7 +58,8 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
     items: [
       // Attendance is per class day: Home's "Today's classes" is its starting point.
       { label: 'Attendance', icon: 'checkmark-done-outline', to: { tab: 'Home', screen: 'TeacherHome' } },
-      { label: 'Tests & marks', icon: 'document-text-outline' },
+      // Tests belong to a batch: the list is the way in (batch → Tests & marks).
+      { label: 'Tests & marks', icon: 'document-text-outline', to: { tab: 'Batches', screen: 'BatchList' } },
       { label: 'Homework', icon: 'create-outline' },
     ],
   },

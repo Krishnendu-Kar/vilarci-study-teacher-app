@@ -5,7 +5,17 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../../theme/ThemeProvider';
 import { spacing } from '../../theme/tokens';
-import { feeFor, studentName, useBatchRoster, usePrivateBatch } from '../../lib/api/privateBatches';
+import {
+  describeMemberError,
+  feeFor,
+  studentName,
+  useBatchRoster,
+  usePrivateBatch,
+  useSetStudentFee,
+} from '../../lib/api/privateBatches';
+import { useLocalStore } from '../../lib/local/store';
+import { firstName } from '../../lib/utils/whatsapp';
+import { useWhatsApp } from '../../components/real/WhatsApp';
 import {
   buildLedger,
   describeFeeError,
@@ -40,6 +50,12 @@ export function StudentFeesScreen() {
   const months = useEnrolmentMonths(enrolmentId);
   const { refreshing, refresh } = useRefresh();
   const [open, setOpen] = useState<LedgerMonth | null>(null);
+  const [feeOpen, setFeeOpen] = useState(false);
+  const setFee = useSetStudentFee();
+  const toast = useToast();
+  const whatsApp = useWhatsApp();
+  const me = useLocalStore((s) => s.account?.me);
+  const teacherName = me ? [me.first_name, me.last_name].filter(Boolean).join(' ') : '';
 
   const member = roster.find((r) => r.id === enrolmentId);
   const name = member ? studentName(member) : 'Student';
@@ -76,6 +92,7 @@ export function StudentFeesScreen() {
   }
 
   const monthly = member ? feeFor(member, batch) : batch.monthly_fee;
+  const ownFee = member?.fee_override != null;
   const ledger = buildLedger(batch.course_start, batch.course_end, months, monthly);
 
   return (
@@ -96,6 +113,46 @@ export function StudentFeesScreen() {
             <Stat value={money(ledger.totalCourse)} label="COURSE" />
           </Row>
         </HeroCard>
+
+        {/* ── This student's monthly fee ─────────────────────────────────── */}
+        <Card style={{ marginTop: spacing.lg }}>
+          <Row justify="space-between" gap={spacing.md}>
+            <View style={{ flex: 1 }}>
+              <AppText variant="caption" tone="muted">
+                {ownFee ? 'Own monthly fee' : 'Monthly fee · same as the batch'}
+              </AppText>
+              <AppText variant="subheading">{money(monthly)} / month</AppText>
+              {ownFee ? (
+                <AppText variant="caption" tone="muted">
+                  Batch fee {money(batch.monthly_fee)}
+                </AppText>
+              ) : null}
+            </View>
+            <Button label="Change" iconName="create-outline" size="sm" variant="secondary" onPress={() => setFeeOpen(true)} />
+          </Row>
+        </Card>
+
+        {/* ── Due: a reminder on WhatsApp ────────────────────────────────── */}
+        {ledger.dueMonths && member ? (
+          <Button
+            label={`Remind on WhatsApp · ${money(ledger.dueAmount)} due`}
+            iconName="logo-whatsapp"
+            variant="success"
+            fullWidth
+            onPress={() => {
+              const due = ledger.months.filter((m) => m.state === 'due').map((m) => monthLabel(m.month));
+              const first = member.student_card.first_name;
+              whatsApp.send(
+                member.contact,
+                (c) =>
+                  `Hello ${firstName(c)}, a gentle reminder${teacherName ? ` from ${teacherName}` : ''}: ` +
+                  `${first}'s fee for ${batch.name} is due for ${due.join(', ')} (${money(ledger.dueAmount)} in all). ` +
+                  'Please ignore this if it is already paid. Thank you!',
+              );
+            }}
+            style={{ marginTop: spacing.md }}
+          />
+        ) : null}
 
         <AppText variant="caption" tone="muted" style={{ marginTop: spacing.lg, marginBottom: spacing.sm }}>
           Tap a month to record a payment, waive it, or undo. Works without internet too.
@@ -144,7 +201,86 @@ export function StudentFeesScreen() {
           onClose={() => setOpen(null)}
         />
       ) : null}
+      {feeOpen && member ? (
+        <FeeSheet
+          name={member.student_card.first_name}
+          current={member.fee_override}
+          batchFee={batch.monthly_fee}
+          busy={setFee.isPending}
+          onClose={() => setFeeOpen(false)}
+          onSave={async (fee) => {
+            try {
+              await setFee.mutateAsync({ id: member.id, fee });
+              setFeeOpen(false);
+              toast.toast(fee == null ? 'Back to the batch fee' : `Fee set to ${money(fee)} a month`, 'success');
+            } catch (err) {
+              toast.toast(describeMemberError(err), 'error');
+            }
+          }}
+        />
+      ) : null}
+      {whatsApp.sheet}
     </View>
+  );
+}
+
+/** Set a student's own monthly fee (online), or go back to the batch fee. */
+function FeeSheet({
+  name,
+  current,
+  batchFee,
+  busy,
+  onClose,
+  onSave,
+}: {
+  name: string;
+  current: number | null;
+  batchFee: number;
+  busy: boolean;
+  onClose: () => void;
+  onSave: (fee: number | null) => void;
+}) {
+  // The form takes whole rupees; the server keeps paise.
+  const [rupees, setRupees] = useState(String(Math.round((current ?? batchFee) / 100)));
+  const [error, setError] = useState<string | null>(null);
+  const save = () => {
+    const n = Number(rupees);
+    if (!rupees || !Number.isInteger(n) || n < 0 || n > 1_000_000) {
+      setError('Enter the monthly fee in rupees (0 to 10,00,000).');
+      return;
+    }
+    onSave(n * 100 === batchFee ? null : n * 100);
+  };
+  return (
+    <Sheet visible onClose={onClose} title={`${name}'s monthly fee`} subtitle={`Batch fee ${money(batchFee)} a month`}>
+      <FormField
+        label="Monthly fee (₹)"
+        keyboardType="number-pad"
+        maxLength={7}
+        value={rupees}
+        onChangeText={(t) => {
+          setRupees(t.replace(/\D/g, ''));
+          if (error) setError(null);
+        }}
+        error={error}
+        hint="For a sibling discount or scholarship. 0 = free."
+      />
+      <AppText variant="caption" tone="muted" style={{ marginTop: spacing.md }}>
+        Changes what’s due for every unpaid month. Paid months keep what was recorded. Needs the internet.
+      </AppText>
+      <Button label="Save fee" iconName="checkmark" fullWidth loading={busy} onPress={save} style={{ marginTop: spacing.lg }} />
+      {current != null ? (
+        <Button
+          label={`Use the batch fee (${money(batchFee)})`}
+          variant="ghost"
+          iconName="arrow-undo-outline"
+          fullWidth
+          disabled={busy}
+          onPress={() => onSave(null)}
+          style={{ marginTop: spacing.sm }}
+        />
+      ) : null}
+    </Sheet>
   );
 }
 

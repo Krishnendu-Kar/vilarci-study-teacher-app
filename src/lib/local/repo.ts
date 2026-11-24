@@ -132,8 +132,9 @@ export interface OutboxLine {
 function outboxKey(c: Change): string {
   if (c.t === 'batches') return `b:${c.b}`;
   if (c.t === 'batch_months') return `bm:${c.b}:${c.m}`;
-  // A notice is sent whole, so a later edit (or the delete) simply replaces the unsent one.
+  // Notices and tests are sent whole, so a later edit (or the delete) simply replaces the unsent one.
   if (c.t === 'batch_notices') return `bn:${c.b}:${c.id}`;
+  if (c.t === 'batch_tests') return `bt:${c.b}:${c.id}`;
   return `em:${c.e}:${c.m}`;
 }
 
@@ -172,10 +173,15 @@ export async function queueChange(db: SQLiteDatabase, change: Change): Promise<v
   });
 }
 
-/** Unsent edits, batch info first (a fee can depend on the course months). */
+/**
+ * Unsent edits in the order the server needs them: batch info first (a fee can
+ * depend on the course months), then tests (marks are only accepted for a test
+ * the server already has), then everything else as it was made.
+ */
 export async function readOutbox(db: SQLiteDatabase): Promise<OutboxLine[]> {
   const rows = await db.getAllAsync<{ key: string; batch_id: string; ver: number; change: string }>(
-    "SELECT key, batch_id, ver, change FROM outbox ORDER BY (key LIKE 'b:%') DESC, ord",
+    `SELECT key, batch_id, ver, change FROM outbox
+      ORDER BY CASE WHEN key LIKE 'b:%' THEN 0 WHEN key LIKE 'bt:%' THEN 1 ELSE 2 END, ord`,
   );
   return rows.map((r) => ({ key: r.key, batch_id: r.batch_id, ver: r.ver, change: JSON.parse(r.change) as Change }));
 }

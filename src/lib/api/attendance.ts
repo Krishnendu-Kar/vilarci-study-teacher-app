@@ -7,7 +7,18 @@
 import { useLocalStore } from '../local/store';
 import type { Batch, BatchMonth, Enrolment, EnrolmentMonth, Session } from '../local/types';
 import { saveEdits } from '../sync/engine';
-import { attendanceStart, ClassDay, classDayOf, dayOfMonth, Mark, markOf, monthOf, scheduledTime } from '../utils/attendance';
+import {
+  addDays,
+  attendanceStart,
+  ClassDay,
+  classDayOf,
+  datesOfMonth,
+  dayOfMonth,
+  Mark,
+  markOf,
+  monthOf,
+  scheduledTime,
+} from '../utils/attendance';
 import { studentName } from './privateBatches';
 
 /** The server keeps a class's time in up to 20 characters and a note in up to 80. */
@@ -80,6 +91,32 @@ export function dayStatus(
   return { day, came, total: onDay.length };
 }
 
+/**
+ * The days the attendance pager swipes through, in order: every class day
+ * (timetable, extra, cancelled) from the course start — or 6 months back — to
+ * the course end — or 3 months ahead — plus `always` (today, a picked date)
+ * even when they have no class.
+ */
+export function pagerDates(
+  batch: Batch,
+  batchMonths: Record<string, BatchMonth>,
+  today: string,
+  always: string[],
+): string[] {
+  const course = { start: batch.course_start, end: batch.course_end };
+  const recorded = Object.keys(batchMonths).sort();
+  let from = batch.course_start ? `${batch.course_start}-01` : addDays(today, -183);
+  if (recorded[0] && `${recorded[0]}-01` < from) from = `${recorded[0]}-01`;
+  let to = batch.course_end ? datesOfMonth(batch.course_end).pop()! : addDays(today, 92);
+  const lastRecorded = recorded[recorded.length - 1];
+  if (lastRecorded && datesOfMonth(lastRecorded).pop()! > to) to = datesOfMonth(lastRecorded).pop()!;
+  const out = new Set(always);
+  for (let d = from, n = 0; d <= to && n < 1500; d = addDays(d, 1), n++) {
+    if (classDayOf(d, batch.weekly_schedule, batchMonths[monthOf(d)]?.sessions, today, course)) out.add(d);
+  }
+  return [...out].sort();
+}
+
 /** The timetable's time for that date when it fits the server's limit. */
 function timetableTime(batch: Batch, iso: string): string | undefined {
   const t = scheduledTime(batch.weekly_schedule, iso);
@@ -137,6 +174,15 @@ export function setMark(batchId: string, enrolmentId: string, iso: string, mark:
 /** Everyone present: clears the day's absent and late marks in one go. */
 export function markAllPresent(batchId: string, iso: string, marked: string[]): Promise<void> {
   return saveEdits(marked.map((e) => markEdit(batchId, e, iso, 'P')));
+}
+
+/** The server keeps a month's remark in up to 300 characters. */
+export const REMARK_MAX = 300;
+
+/** The teacher's note on a student's month (parents see it); empty clears it. */
+export function setRemark(batchId: string, enrolmentId: string, month: string, text: string): Promise<void> {
+  const remark = text.trim().slice(0, REMARK_MAX) || null;
+  return saveEdits([{ t: 'enrolment_months', b: batchId, e: enrolmentId, m: month, patch: { remark } }]);
 }
 
 export function describeAttendanceError(err: unknown): string {

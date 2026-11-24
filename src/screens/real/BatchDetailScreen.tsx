@@ -34,6 +34,12 @@ import { SyncBanner } from '../../components/real/SyncBanner';
 import { BatchAttendanceCard } from '../../components/real/ClassAttendance';
 import { NoticeCard } from '../../components/real/NoticeParts';
 import { useBatchNotices } from '../../lib/api/notices';
+import { rosterForTest, useBatchTests } from '../../lib/api/tests';
+import { useLocalStore } from '../../lib/local/store';
+import { scoreOf } from '../../lib/utils/tests';
+import { TestCard } from '../../components/real/TestParts';
+import { useWhatsApp } from '../../components/real/WhatsApp';
+import { firstName, reachable } from '../../lib/utils/whatsapp';
 
 const RELATION_LABELS: Record<string, string> = {
   self: 'Self',
@@ -58,6 +64,11 @@ export function BatchDetailScreen() {
   const removeMember = useRemoveMember();
   const remove = useDeleteBatch();
   const notices = useBatchNotices(id);
+  const tests = useBatchTests(id);
+  const months = useLocalStore((s) => s.months);
+  const whatsApp = useWhatsApp();
+  const me = useLocalStore((s) => s.account?.me);
+  const teacherName = me ? [me.first_name, me.last_name].filter(Boolean).join(' ') : '';
   const { refreshing, refresh } = useRefresh();
   const [menu, setMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -225,6 +236,58 @@ export function BatchDetailScreen() {
           )}
         </View>
 
+        {/* ── Tests & marks: the latest two ────────────────────────────── */}
+        <View style={{ marginTop: spacing.xxl }}>
+          <SectionHeader
+            title="Tests & marks"
+            subtitle={tests.length ? `${tests.length} test${tests.length === 1 ? '' : 's'}` : undefined}
+            action={tests.length ? 'All' : undefined}
+            onAction={() => navigation.navigate('BatchTests', { id: b.id })}
+          />
+          {tests.length ? (
+            <View style={{ gap: spacing.md }}>
+              {tests.slice(0, 2).map((t) => {
+                const sheet = rosterForTest(rows, months, t.id);
+                return (
+                  <Pressable
+                    key={t.id}
+                    onPress={() => navigation.navigate('TestMarks', { batchId: b.id, testId: t.id })}
+                    accessibilityRole="button"
+                    style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+                  >
+                    <TestCard
+                      test={t}
+                      entered={sheet.filter((r) => scoreOf(months[r.id], t.id) != null).length}
+                      total={sheet.length}
+                    />
+                  </Pressable>
+                );
+              })}
+              <Button
+                label="New test"
+                iconName="add"
+                variant="secondary"
+                size="sm"
+                onPress={() => navigation.navigate('BatchTests', { id: b.id, compose: true })}
+                style={{ alignSelf: 'flex-start' }}
+              />
+            </View>
+          ) : (
+            <Card muted>
+              <AppText variant="caption" tone="muted">
+                Create a test and enter the class’s marks — offline too. Parents see their child’s score and the class average.
+              </AppText>
+              <Button
+                label="New test"
+                iconName="add"
+                size="sm"
+                onPress={() => navigation.navigate('BatchTests', { id: b.id, compose: true })}
+                style={{ marginTop: spacing.md, alignSelf: 'flex-start' }}
+              />
+            </Card>
+          )}
+        </View>
+
         {/* ── Requests ─────────────────────────────────────────────────── */}
         {requests.length ? (
           <View style={{ marginTop: spacing.xxl }}>
@@ -291,11 +354,33 @@ export function BatchDetailScreen() {
                         <Button label="Remove" variant="danger" size="sm" onPress={() => onRemove(r)} />
                       </Row>
                     ) : (
-                      <Pressable onPress={() => setConfirmRemove(r.id)} hitSlop={8} accessibilityRole="button">
-                        <AppText variant="captionStrong" tone="error">
-                          Remove
-                        </AppText>
-                      </Pressable>
+                      <Row gap={spacing.lg}>
+                        {reachable(r.contact).length ? (
+                          <Pressable
+                            onPress={() =>
+                              whatsApp.send(
+                                r.contact,
+                                (c) => `Hello ${firstName(c)}, this is ${teacherName || 'the teacher'} from ${b.name}. `,
+                              )
+                            }
+                            hitSlop={8}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Message ${r.student_card.first_name}'s parent on WhatsApp`}
+                          >
+                            <Row gap={3}>
+                              <Ionicons name="logo-whatsapp" size={15} color={colors.success} />
+                              <AppText variant="captionStrong" style={{ color: colors.success }}>
+                                WhatsApp
+                              </AppText>
+                            </Row>
+                          </Pressable>
+                        ) : null}
+                        <Pressable onPress={() => setConfirmRemove(r.id)} hitSlop={8} accessibilityRole="button">
+                          <AppText variant="captionStrong" tone="error">
+                            Remove
+                          </AppText>
+                        </Pressable>
+                      </Row>
                     )}
                   </Row>
                 </View>
@@ -328,6 +413,12 @@ export function BatchDetailScreen() {
             title="Add students"
             subtitle="QR code, join link and code"
             onPress={fromMenu(() => navigation.navigate('BatchInvite', { id: b.id }))}
+          />
+          <MenuRow
+            icon="document-text-outline"
+            title="Tests & marks"
+            subtitle="Create a test, enter the class’s marks"
+            onPress={fromMenu(() => navigation.navigate('BatchTests', { id: b.id }))}
           />
           <MenuRow
             icon="megaphone-outline"
@@ -365,6 +456,7 @@ export function BatchDetailScreen() {
         </View>
       </Sheet>
 
+      {whatsApp.sheet}
       <ConfirmSheet
         visible={confirmDelete}
         title={`Delete “${b.name}”?`}

@@ -241,6 +241,21 @@ export function useRemoveMember() {
   });
 }
 
+/**
+ * A student's own monthly fee (sibling discount, scholarship…) in paise, or
+ * null to go back to the batch fee. Online: the parent's ledger follows on
+ * their next sync. Months already paid keep what was recorded.
+ */
+export function useSetStudentFee() {
+  return useMutation({
+    mutationFn: async ({ id, fee }: { id: string; fee: number | null }) => {
+      const { error } = await supabase.rpc('enrolment_set_fee', { p_enrolment_id: id, p_fee: fee });
+      if (error) throw error;
+      await requestSync();
+    },
+  });
+}
+
 export function describeMemberError(err: unknown): string {
   const msg = String((err as Error)?.message ?? '');
   if (/batch is full/i.test(msg)) return 'This batch is full. Increase seats in Edit to accept more students.';

@@ -22,6 +22,8 @@ import { AttendanceDayScreen } from '../screens/real/AttendanceDayScreen';
 import { BatchInviteScreen } from '../screens/real/BatchInviteScreen';
 import { BatchInfoScreen } from '../screens/real/BatchInfoScreen';
 import { BatchNoticesScreen } from '../screens/real/BatchNoticesScreen';
+import { BatchTestsScreen } from '../screens/real/BatchTestsScreen';
+import { TestMarksScreen } from '../screens/real/TestMarksScreen';
 import { AttendanceRegisterScreen } from '../screens/real/AttendanceRegisterScreen';
 import { ComingSoonScreen, InstitutesComingSoon } from '../screens/real/ComingSoonScreen';
 import { MoreScreen as RealMoreScreen } from '../screens/real/MoreScreen';
@@ -74,6 +76,8 @@ function RealBatchesNavigator() {
       <RealBatchesStack.Screen name="BatchInvite" component={BatchInviteScreen} />
       <RealBatchesStack.Screen name="BatchInfo" component={BatchInfoScreen} />
       <RealBatchesStack.Screen name="BatchNotices" component={BatchNoticesScreen} />
+      <RealBatchesStack.Screen name="BatchTests" component={BatchTestsScreen} />
+      <RealBatchesStack.Screen name="TestMarks" component={TestMarksScreen} />
       <RealBatchesStack.Screen name="AttendanceDay" component={AttendanceDayScreen} />
       <RealBatchesStack.Screen name="AttendanceRegister" component={AttendanceRegisterScreen} />
     </RealBatchesStack.Navigator>

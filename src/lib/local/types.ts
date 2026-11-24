@@ -148,9 +148,13 @@ export interface BatchTest {
   subject: string | null;
   held_on: string;
   max_marks: number;
+  /** Worked out on the teacher's phone (utils/tests TestSummary): count, average, highest… */
   summary: Record<string, unknown> | null;
+  created_at?: number;
   deleted_at: number | null;
   seq: number;
+  /** Phone only: made or edited here and not uploaded yet. */
+  pending?: boolean;
 }
 
 export interface BatchNotice {
@@ -204,9 +208,20 @@ export interface NoticeFields {
   pinned: boolean;
 }
 
+/** A test is sent whole (the latest edit wins); the id is made on the phone. */
+export interface TestFields {
+  title: string;
+  subject: string | null;
+  held_on: string;
+  max_marks: number;
+  summary: Record<string, unknown> | null;
+}
+
 export type Change =
   | { t: 'batches'; b: string; at: number; data: BatchFields }
   | { t: 'batch_months'; b: string; at: number; m: string; patch: SessionsPatch }
+  | { t: 'batch_tests'; b: string; at: number; id: string; data: TestFields }
+  | { t: 'batch_tests'; b: string; at: number; id: string; deleted: true }
   | { t: 'batch_notices'; b: string; at: number; id: string; data: NoticeFields }
   | { t: 'batch_notices'; b: string; at: number; id: string; deleted: true }
   | { t: 'enrolment_months'; b: string; at: number; e: string; m: string; patch: MonthPatch };
