@@ -47,20 +47,34 @@ export async function loadClock(): Promise<void> {
 
 type Edit = Change extends infer C ? (C extends Change ? Omit<C, 'at'> : never) : never;
 
+/** Saves run one after another, so quick taps never race on the same outbox line. */
+let saving: Promise<void> = Promise.resolve();
+
 /**
- * Save an edit on the phone: it shows at once, and uploads shortly after
- * (or when the internet is back).
+ * Save edits on the phone: they show at once, and upload shortly after (or
+ * when the internet is back). Several edits (a whole class's attendance) go in
+ * together and the screens re-read the copy once.
  */
-export async function saveEdit(edit: Edit): Promise<void> {
-  const open = currentDb();
-  if (!open) throw new Error('Please log in again.');
-  await repo.queueChange(open.db, { ...edit, at: serverNow() } as Change);
-  await loadLocalStore(open.db);
-  if (editTimer) clearTimeout(editTimer);
-  editTimer = setTimeout(() => {
-    editTimer = null;
-    requestSync();
-  }, EDIT_DELAY_MS);
+export function saveEdits(edits: Edit[]): Promise<void> {
+  const run = saving.then(async () => {
+    const open = currentDb();
+    if (!open) throw new Error('Please log in again.');
+    if (!edits.length) return;
+    const at = serverNow();
+    for (const edit of edits) await repo.queueChange(open.db, { ...edit, at } as Change);
+    await loadLocalStore(open.db);
+    if (editTimer) clearTimeout(editTimer);
+    editTimer = setTimeout(() => {
+      editTimer = null;
+      requestSync();
+    }, EDIT_DELAY_MS);
+  });
+  saving = run.catch(() => {});
+  return run;
+}
+
+export function saveEdit(edit: Edit): Promise<void> {
+  return saveEdits([edit]);
 }
 
 /**

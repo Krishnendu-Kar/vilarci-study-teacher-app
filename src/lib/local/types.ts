@@ -191,8 +191,14 @@ export interface MonthPatch {
   remark?: string | null;
 }
 
+/** Class days of a month: day "DD" → the class (held / cancelled / extra), null removes the record. */
+export interface SessionsPatch {
+  sessions: Record<string, Session | null>;
+}
+
 export type Change =
   | { t: 'batches'; b: string; at: number; data: BatchFields }
+  | { t: 'batch_months'; b: string; at: number; m: string; patch: SessionsPatch }
   | { t: 'enrolment_months'; b: string; at: number; e: string; m: string; patch: MonthPatch };
 
 // ── the sync call ─────────────────────────────────────────────────────────

@@ -131,6 +131,18 @@ export function useDeleteBatch() {
   });
 }
 
+/** A new join code (online): the old link, QR and code stop working. */
+export function useResetJoinCode() {
+  return useMutation({
+    mutationFn: async (id: string): Promise<string> => {
+      const { data, error } = await supabase.rpc('batch_reset_code', { p_batch_id: id });
+      if (error) throw error;
+      await requestSync();
+      return (data as { join_code: string }).join_code;
+    },
+  });
+}
+
 export function describeBatchError(err: unknown): string {
   const msg = String((err as Error)?.message ?? '');
   if (/at most 50 batches/i.test(msg)) return `You can have up to ${BATCH_LIMITS.perTeacher} batches.`;

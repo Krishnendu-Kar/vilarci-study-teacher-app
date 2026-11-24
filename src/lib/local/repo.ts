@@ -130,13 +130,18 @@ export interface OutboxLine {
 
 /** The row a change edits; two edits of one row share a line. */
 function outboxKey(c: Change): string {
-  return c.t === 'batches' ? `b:${c.b}` : `em:${c.e}:${c.m}`;
+  if (c.t === 'batches') return `b:${c.b}`;
+  if (c.t === 'batch_months') return `bm:${c.b}:${c.m}`;
+  return `em:${c.e}:${c.m}`;
 }
 
 /** A later edit on top of an earlier, unsent one: newer fields win, maps merge key by key. */
 function mergeChange(old: Change, next: Change): Change {
   const at = Math.max(old.at, next.at);
   if (old.t === 'batches' && next.t === 'batches') return { ...next, at, data: { ...old.data, ...next.data } };
+  if (old.t === 'batch_months' && next.t === 'batch_months') {
+    return { ...next, at, patch: { sessions: { ...old.patch.sessions, ...next.patch.sessions } } };
+  }
   if (old.t === 'enrolment_months' && next.t === 'enrolment_months') {
     const patch = { ...old.patch, ...next.patch };
     if (old.patch.att && next.patch.att) patch.att = { ...old.patch.att, ...next.patch.att };

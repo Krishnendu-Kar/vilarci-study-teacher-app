@@ -18,6 +18,10 @@ import { BatchesScreen as RealBatchesScreen } from '../screens/real/BatchesScree
 import { BatchFormScreen } from '../screens/real/BatchFormScreen';
 import { BatchDetailScreen } from '../screens/real/BatchDetailScreen';
 import { StudentFeesScreen } from '../screens/real/StudentFeesScreen';
+import { AttendanceDayScreen } from '../screens/real/AttendanceDayScreen';
+import { BatchInviteScreen } from '../screens/real/BatchInviteScreen';
+import { BatchInfoScreen } from '../screens/real/BatchInfoScreen';
+import { AttendanceRegisterScreen } from '../screens/real/AttendanceRegisterScreen';
 import { ComingSoonScreen, InstitutesComingSoon } from '../screens/real/ComingSoonScreen';
 import { MoreScreen as RealMoreScreen } from '../screens/real/MoreScreen';
 import { RealSideMenuProvider } from '../components/real/RealSideMenu';
@@ -52,6 +56,9 @@ function RealHomeNavigator() {
       <RealHomeStack.Screen name="TeacherHome" component={TeacherHomeScreen} />
       <RealHomeStack.Screen name="TeacherProfileForm" component={TeacherProfileFormScreen} />
       <RealHomeStack.Screen name="Account" component={AccountScreen} />
+      {/* Today's classes on Home open attendance without leaving the tab. */}
+      <RealHomeStack.Screen name="AttendanceDay" component={AttendanceDayScreen} />
+      <RealHomeStack.Screen name="AttendanceRegister" component={AttendanceRegisterScreen} />
     </RealHomeStack.Navigator>
   );
 }
@@ -63,6 +70,10 @@ function RealBatchesNavigator() {
       <RealBatchesStack.Screen name="BatchForm" component={BatchFormScreen} />
       <RealBatchesStack.Screen name="BatchDetail" component={BatchDetailScreen} />
       <RealBatchesStack.Screen name="StudentFees" component={StudentFeesScreen} />
+      <RealBatchesStack.Screen name="BatchInvite" component={BatchInviteScreen} />
+      <RealBatchesStack.Screen name="BatchInfo" component={BatchInfoScreen} />
+      <RealBatchesStack.Screen name="AttendanceDay" component={AttendanceDayScreen} />
+      <RealBatchesStack.Screen name="AttendanceRegister" component={AttendanceRegisterScreen} />
     </RealBatchesStack.Navigator>
   );
 }

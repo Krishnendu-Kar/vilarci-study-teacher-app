@@ -56,7 +56,8 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
   {
     title: 'CLASSROOM',
     items: [
-      { label: 'Attendance', icon: 'checkmark-done-outline' },
+      // Attendance is per class day: Home's "Today's classes" is its starting point.
+      { label: 'Attendance', icon: 'checkmark-done-outline', to: { tab: 'Home', screen: 'TeacherHome' } },
       { label: 'Tests & marks', icon: 'document-text-outline' },
       { label: 'Homework', icon: 'create-outline' },
     ],

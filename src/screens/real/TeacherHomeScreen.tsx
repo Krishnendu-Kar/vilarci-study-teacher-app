@@ -15,6 +15,7 @@ import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
 import { RealMenuButton } from '../../components/real/RealSideMenu';
 import { SyncBanner } from '../../components/real/SyncBanner';
+import { TodayClasses } from '../../components/real/ClassAttendance';
 
 /**
  * Home of the real teacher app, read from the phone's copy: the account,
@@ -117,6 +118,9 @@ export function TeacherHomeScreen() {
             </Card>
           </Pressable>
         ) : null}
+
+        {/* ── Today's classes: one tap to take attendance ──────────────── */}
+        {t ? <TodayClasses /> : null}
 
         {/* ── Private batches ───────────────────────────────────────────── */}
         {t ? (

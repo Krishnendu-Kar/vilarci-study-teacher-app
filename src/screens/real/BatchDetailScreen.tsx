@@ -20,15 +20,18 @@ import {
 } from '../../lib/api/privateBatches';
 import type { ContactCard } from '../../lib/local/types';
 import { useRefresh } from '../../lib/sync/useRefresh';
-import { DAY_KEYS, DAY_LABELS, isClosed } from '../../lib/utils/schedule';
 import { formatDateLong, money, todayIso } from '../../lib/utils/format';
 import { courseLabel, monthLabel } from '../../lib/utils/months';
-import { AppText, Avatar, Card, Divider, EmptyState, HeroCard, KeyValue, Pill, Row, SectionHeader } from '../../components/ui/base';
+import { monthOf } from '../../lib/utils/attendance';
+import { AppText, Avatar, Card, Divider, EmptyState, HeroCard, IconName, Row, SectionHeader } from '../../components/ui/base';
 import { Button } from '../../components/ui/Button';
+import { ConfirmSheet } from '../../components/ui/ConfirmSheet';
 import { Screen } from '../../components/ui/Screen';
+import { Sheet } from '../../components/ui/Sheet';
 import { useToast } from '../../components/ui/Toast';
 import { RealTopBar } from '../../components/real/RealTopBar';
 import { SyncBanner } from '../../components/real/SyncBanner';
+import { BatchAttendanceCard } from '../../components/real/ClassAttendance';
 
 const RELATION_LABELS: Record<string, string> = {
   self: 'Self',
@@ -41,7 +44,7 @@ const RELATION_LABELS: Record<string, string> = {
 /** A millisecond time as "14 Oct 2026". */
 const dayOf = (ms: number) => formatDateLong(todayIso(new Date(ms)));
 
-/** One batch: join link, requests to approve, students, timetable. */
+/** One batch: today's attendance, requests to approve and students. Everything else is in the ⋮ menu. */
 export function BatchDetailScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation<any>();
@@ -53,6 +56,7 @@ export function BatchDetailScreen() {
   const removeMember = useRemoveMember();
   const remove = useDeleteBatch();
   const { refreshing, refresh } = useRefresh();
+  const [menu, setMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
 
@@ -78,15 +82,21 @@ export function BatchDetailScreen() {
   const rows = roster.data;
   const requests = rows.filter((r) => r.status === 'pending');
   const members = rows.filter((r) => r.status === 'approved');
-  const link = joinLinkFor(b.join_code);
   const level = gradeBoardLabel(b);
+  const course = courseLabel(b.course_start, b.course_end);
 
   const shareLink = () =>
     Share.share({
       message:
         `Join my ${b.subject} batch "${b.name}"${level ? ` (${level})` : ''} on Vilarci Study.\n\n` +
-        `Tap to join: ${link}\nJoin code: ${b.join_code}`,
+        `Tap to join: ${joinLinkFor(b.join_code)}\nJoin code: ${b.join_code}`,
     }).catch(() => {});
+
+  /** Close the menu, then go — after its slide-out, so two sheets never overlap (iOS refuses that). */
+  const fromMenu = (go: () => void) => () => {
+    setMenu(false);
+    setTimeout(go, 300);
+  };
 
   const onDecide = async (r: RosterRow, approve: boolean) => {
     const first = r.student_card.first_name;
@@ -109,13 +119,13 @@ export function BatchDetailScreen() {
   };
 
   const doDelete = async () => {
+    setConfirmDelete(false);
     try {
       await remove.mutateAsync(b.id);
       toast.toast('Batch deleted', 'info');
       navigation.goBack();
     } catch (err) {
       toast.toast(describeBatchError(err), 'error');
-      setConfirmDelete(false);
     }
   };
 
@@ -123,31 +133,51 @@ export function BatchDetailScreen() {
     <View style={{ flex: 1, backgroundColor: colors.bgApp }}>
       <RealTopBar
         title={b.name}
-        right={<Button label="Edit" iconName="create-outline" size="sm" variant="secondary" onPress={() => navigation.navigate('BatchForm', { id: b.id })} />}
+        right={
+          <Pressable
+            onPress={() => setMenu(true)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Batch options"
+            style={({ pressed }) => [styles.iconBtn, { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.6 : 1 }]}
+          >
+            <Ionicons name="ellipsis-vertical" size={18} color={colors.textMain} />
+          </Pressable>
+        }
       />
       <Screen refreshing={refreshing} onRefresh={refresh}>
         <SyncBanner />
-        {/* Join link */}
+
+        {/* ── The batch at a glance ────────────────────────────────────── */}
         <HeroCard>
-          <AppText variant="overline" style={{ color: colors.goldBright }}>
-            INVITE STUDENTS
+          <AppText variant="overline" style={{ color: colors.goldBright }} numberOfLines={1}>
+            {[b.subject, level].filter(Boolean).join(' · ').toUpperCase()}
           </AppText>
-          <AppText style={styles.code}>{b.join_code}</AppText>
-          <AppText variant="caption" numberOfLines={1} style={{ color: 'rgba(253,251,249,0.7)' }}>
-            {link}
+          <AppText variant="display" numberOfLines={2} style={{ color: '#FDFBF9', marginTop: 2 }}>
+            {b.name}
           </AppText>
-          <AppText variant="caption" style={{ color: 'rgba(253,251,249,0.7)', marginTop: 4 }}>
-            Students open the link in Vilarci Study and request to join. You approve each one.
-          </AppText>
-          <Pressable onPress={shareLink} accessibilityRole="button" style={({ pressed }) => [styles.shareBtn, { opacity: pressed ? 0.8 : 1 }]}>
-            <Ionicons name="share-social-outline" size={16} color="#3B0A1A" />
+          <View style={{ marginTop: spacing.md, gap: 6 }}>
+            <HeroLine icon="people-outline" text={`${members.length} of ${b.capacity} students${requests.length ? ` · ${requests.length} waiting` : ''}`} />
+            {course ? <HeroLine icon="calendar-outline" text={course} /> : null}
+            {b.room ? <HeroLine icon="location-outline" text={b.room} /> : null}
+            <HeroLine icon="key-outline" text={`Join code ${b.join_code}`} />
+          </View>
+          <Pressable
+            onPress={() => navigation.navigate('BatchInvite', { id: b.id })}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.heroBtn, { opacity: pressed ? 0.8 : 1 }]}
+          >
+            <Ionicons name="person-add-outline" size={16} color="#3B0A1A" />
             <AppText variant="captionStrong" style={{ color: '#3B0A1A' }}>
-              Share join link
+              Add students
             </AppText>
           </Pressable>
         </HeroCard>
 
-        {/* Requests */}
+        {/* ── Attendance: today's class and the register ───────────────── */}
+        <BatchAttendanceCard batch={b} />
+
+        {/* ── Requests ─────────────────────────────────────────────────── */}
         {requests.length ? (
           <View style={{ marginTop: spacing.xxl }}>
             <SectionHeader title="Join requests" subtitle={`${requests.length} waiting for you`} />
@@ -168,9 +198,14 @@ export function BatchDetailScreen() {
           </View>
         ) : null}
 
-        {/* Students */}
+        {/* ── Students ─────────────────────────────────────────────────── */}
         <View style={{ marginTop: spacing.xxl }}>
-          <SectionHeader title="Students" subtitle={`${members.length} of ${b.capacity} seats filled`} />
+          <SectionHeader
+            title="Students"
+            subtitle={`${members.length} of ${b.capacity} seats filled`}
+            action="Add"
+            onAction={() => navigation.navigate('BatchInvite', { id: b.id })}
+          />
           {roster.isLoading ? (
             <ActivityIndicator color={colors.primary} />
           ) : members.length ? (
@@ -219,73 +254,122 @@ export function BatchDetailScreen() {
               ))}
             </Card>
           ) : (
-            <EmptyState
-              icon="people-outline"
-              title="No students yet"
-              message="Share the join link. Requests show up here for you to accept."
-            />
-          )}
-        </View>
-
-        {/* Overview */}
-        <Card style={{ marginTop: spacing.xxl }}>
-          <Row gap={5} wrap>
-            <Pill label={b.subject} tone="primary" />
-            {level ? <Pill label={level} /> : null}
-          </Row>
-          <Divider style={{ marginVertical: spacing.md }} />
-          <KeyValue label="Monthly fee" value={`${money(b.monthly_fee)} / month`} />
-          <KeyValue label="Course" value={courseLabel(b.course_start, b.course_end) ?? 'Not set — tap Edit'} />
-          <KeyValue label="Seats" value={`${members.length} of ${b.capacity} filled`} />
-          {b.room ? <KeyValue label="Room / venue" value={b.room} /> : null}
-          <KeyValue label="Created" value={dayOf(b.created_at)} />
-        </Card>
-
-        {/* Timetable */}
-        <View style={{ marginTop: spacing.xxl }}>
-          <SectionHeader title="Weekly timetable" />
-          <Card padded={false}>
-            {DAY_KEYS.map((d, i) => {
-              const v = b.weekly_schedule[d];
-              const open = !isClosed(v);
-              return (
-                <View key={d}>
-                  {i > 0 ? <Divider inset={spacing.lg} /> : null}
-                  <Row justify="space-between" style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}>
-                    <AppText variant="subheading" style={{ color: open ? colors.textMain : colors.textMuted }}>
-                      {DAY_LABELS[d]}
-                    </AppText>
-                    <AppText variant={open ? 'bodyStrong' : 'caption'} style={{ color: open ? colors.primary : colors.textMuted }}>
-                      {open ? v.replace(/\s*-\s*/, ' – ') : 'No class'}
-                    </AppText>
-                  </Row>
-                </View>
-              );
-            })}
-          </Card>
-        </View>
-
-        {/* Delete */}
-        <View style={{ marginTop: spacing.xxl }}>
-          {confirmDelete ? (
-            <View style={{ padding: spacing.lg, borderRadius: radius.lg, backgroundColor: colors.errorBg }}>
-              <AppText variant="subheading" style={{ color: colors.errorText }}>
-                Delete “{b.name}”?
-              </AppText>
-              <AppText variant="caption" style={{ color: colors.errorText, marginTop: 2 }}>
-                Students stop seeing it and the join link stops working. Needs the internet.
-              </AppText>
-              <Row gap={spacing.sm} style={{ marginTop: spacing.md }}>
-                <Button label="Cancel" variant="secondary" size="sm" onPress={() => setConfirmDelete(false)} />
-                <Button label="Delete batch" variant="danger" size="sm" iconName="trash-outline" loading={remove.isPending} onPress={doDelete} />
-              </Row>
-            </View>
-          ) : (
-            <Button label="Delete this batch" variant="ghost" iconName="trash-outline" fullWidth onPress={() => setConfirmDelete(true)} />
+            <>
+              <EmptyState
+                icon="people-outline"
+                title="No students yet"
+                message="Show them the QR or share the join link. Requests show up here for you to accept."
+              />
+              <Button
+                label="Add students"
+                iconName="person-add-outline"
+                fullWidth
+                onPress={() => navigation.navigate('BatchInvite', { id: b.id })}
+                style={{ marginTop: spacing.md }}
+              />
+            </>
           )}
         </View>
       </Screen>
+
+      {/* ── ⋮ menu ─────────────────────────────────────────────────────── */}
+      <Sheet visible={menu} onClose={() => setMenu(false)} title={b.name} subtitle={[b.subject, level].filter(Boolean).join(' · ')}>
+        <View style={{ paddingBottom: spacing.md }}>
+          <MenuRow
+            icon="person-add-outline"
+            title="Add students"
+            subtitle="QR code, join link and code"
+            onPress={fromMenu(() => navigation.navigate('BatchInvite', { id: b.id }))}
+          />
+          <MenuRow
+            icon="create-outline"
+            title="Edit batch"
+            subtitle="Name, timetable, fee, seats, course"
+            onPress={fromMenu(() => navigation.navigate('BatchForm', { id: b.id }))}
+          />
+          <MenuRow
+            icon="information-circle-outline"
+            title="Batch info"
+            subtitle="Everything set on this batch"
+            onPress={fromMenu(() => navigation.navigate('BatchInfo', { id: b.id }))}
+          />
+          <MenuRow
+            icon="calendar-outline"
+            title="Attendance register"
+            subtitle="Month view of classes and students"
+            onPress={fromMenu(() => navigation.navigate('AttendanceRegister', { batchId: b.id, month: monthOf(todayIso()) }))}
+          />
+          <MenuRow icon="share-social-outline" title="Share join link" onPress={fromMenu(shareLink)} />
+          <Divider style={{ marginVertical: spacing.sm }} />
+          <MenuRow
+            icon="trash-outline"
+            title="Delete batch"
+            subtitle="Students stop seeing it · needs the internet"
+            danger
+            onPress={fromMenu(() => setConfirmDelete(true))}
+          />
+        </View>
+      </Sheet>
+
+      <ConfirmSheet
+        visible={confirmDelete}
+        title={`Delete “${b.name}”?`}
+        message="Students stop seeing it and the join link stops working. Needs the internet."
+        confirmLabel="Delete batch"
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={doDelete}
+      />
     </View>
+  );
+}
+
+function MenuRow({
+  icon,
+  title,
+  subtitle,
+  danger,
+  onPress,
+}: {
+  icon: IconName;
+  title: string;
+  subtitle?: string;
+  danger?: boolean;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+  const tint = danger ? colors.error : colors.primary;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.menuRow, { backgroundColor: pressed ? colors.surfaceMuted : 'transparent' }]}
+    >
+      <View style={[styles.menuIcon, { backgroundColor: danger ? colors.errorBg : colors.primarySubtle }]}>
+        <Ionicons name={icon} size={18} color={tint} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <AppText variant="bodyStrong" style={{ color: danger ? colors.error : colors.textMain }}>
+          {title}
+        </AppText>
+        {subtitle ? (
+          <AppText variant="caption" tone="muted" numberOfLines={1}>
+            {subtitle}
+          </AppText>
+        ) : null}
+      </View>
+      {danger ? null : <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />}
+    </Pressable>
+  );
+}
+
+function HeroLine({ icon, text }: { icon: IconName; text: string }) {
+  return (
+    <Row gap={6}>
+      <Ionicons name={icon} size={14} color="rgba(253,251,249,0.7)" />
+      <AppText variant="caption" numberOfLines={1} style={{ color: 'rgba(253,251,249,0.85)', flex: 1 }}>
+        {text}
+      </AppText>
+    </Row>
   );
 }
 
@@ -319,16 +403,15 @@ function contactLine(contact: ContactCard[] | null): string {
 }
 
 const styles = StyleSheet.create({
-  code: {
-    fontSize: 30,
-    lineHeight: 38,
-    letterSpacing: 3,
-    fontWeight: '800',
-    color: '#FDFBF9',
-    marginTop: 4,
-    marginBottom: 2,
+  iconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  shareBtn: {
+  heroBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
@@ -339,4 +422,13 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: '#E0B23C',
   },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+  },
+  menuIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
 });

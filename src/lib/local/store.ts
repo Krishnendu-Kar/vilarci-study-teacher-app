@@ -98,6 +98,7 @@ function patchMonth(row: EnrolmentMonth, p: MonthPatch): EnrolmentMonth {
 /** The outbox over the server's rows, so the teacher sees their edits straight away. */
 function overlay(
   batches: Record<string, Batch>,
+  batchMonths: Record<string, Record<string, BatchMonth>>,
   months: Record<string, Record<string, EnrolmentMonth>>,
   outbox: OutboxLine[],
 ): void {
@@ -105,6 +106,10 @@ function overlay(
     if (c.t === 'batches') {
       const b = batches[c.b];
       if (b) batches[c.b] = { ...b, ...c.data };
+    } else if (c.t === 'batch_months') {
+      const byMonth = (batchMonths[c.b] ??= {});
+      const row = byMonth[c.m] ?? { batch_id: c.b, month: c.m, sessions: {}, seq: 0 };
+      byMonth[c.m] = { ...row, sessions: patchMap(row.sessions, c.patch.sessions) };
     } else {
       const byMonth = (months[c.e] ??= {});
       const row = byMonth[c.m] ?? { enrolment_id: c.e, month: c.m, batch_id: c.b, att: {}, fee: null, score: {}, remark: null, seq: 0 };
@@ -117,14 +122,15 @@ function overlay(
 export async function loadLocalStore(db: SQLiteDatabase): Promise<void> {
   const rows = await readAll(db);
   const batches = Object.fromEntries(rows.batches.map((b) => [b.id, b]));
+  const batchMonths = index(rows.batchMonths, (r) => r.batch_id, (r) => r.month);
   const months = index(rows.months, (r) => r.enrolment_id, (r) => r.month);
-  overlay(batches, months, rows.outbox);
+  overlay(batches, batchMonths, months, rows.outbox);
   useLocalStore.setState({
     ready: true,
     account: rows.account,
     lastSyncedAt: rows.syncedAt,
     batches,
-    batchMonths: index(rows.batchMonths, (r) => r.batch_id, (r) => r.month),
+    batchMonths,
     tests: group(rows.tests, (r) => r.batch_id),
     notices: group(
       rows.notices.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.created_at - a.created_at),
