@@ -161,6 +161,8 @@ export interface BatchNotice {
   created_at: number;
   deleted_at: number | null;
   seq: number;
+  /** Phone only: posted or edited here and not uploaded yet. */
+  pending?: boolean;
 }
 
 // ── uploads (the outbox) ──────────────────────────────────────────────────
@@ -196,9 +198,17 @@ export interface SessionsPatch {
   sessions: Record<string, Session | null>;
 }
 
+/** A notice is sent whole (the latest edit wins); the id is made on the phone. */
+export interface NoticeFields {
+  body: string;
+  pinned: boolean;
+}
+
 export type Change =
   | { t: 'batches'; b: string; at: number; data: BatchFields }
   | { t: 'batch_months'; b: string; at: number; m: string; patch: SessionsPatch }
+  | { t: 'batch_notices'; b: string; at: number; id: string; data: NoticeFields }
+  | { t: 'batch_notices'; b: string; at: number; id: string; deleted: true }
   | { t: 'enrolment_months'; b: string; at: number; e: string; m: string; patch: MonthPatch };
 
 // ── the sync call ─────────────────────────────────────────────────────────

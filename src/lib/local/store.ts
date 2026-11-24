@@ -5,6 +5,7 @@
 import { create } from 'zustand';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { OutboxLine, readAll } from './repo';
+import { sortNotices } from '../utils/notices';
 import type {
   AccountSnapshot,
   Batch,
@@ -95,13 +96,18 @@ function patchMonth(row: EnrolmentMonth, p: MonthPatch): EnrolmentMonth {
   };
 }
 
-/** The outbox over the server's rows, so the teacher sees their edits straight away. */
+/**
+ * The outbox over the server's rows, so the teacher sees their edits straight
+ * away. Returns the notices with unsent posts, edits and deletes applied.
+ */
 function overlay(
   batches: Record<string, Batch>,
   batchMonths: Record<string, Record<string, BatchMonth>>,
   months: Record<string, Record<string, EnrolmentMonth>>,
+  notices: BatchNotice[],
   outbox: OutboxLine[],
-): void {
+): BatchNotice[] {
+  let list = notices;
   for (const { change: c } of outbox) {
     if (c.t === 'batches') {
       const b = batches[c.b];
@@ -110,12 +116,23 @@ function overlay(
       const byMonth = (batchMonths[c.b] ??= {});
       const row = byMonth[c.m] ?? { batch_id: c.b, month: c.m, sessions: {}, seq: 0 };
       byMonth[c.m] = { ...row, sessions: patchMap(row.sessions, c.patch.sessions) };
+    } else if (c.t === 'batch_notices') {
+      const at = list.findIndex((n) => n.batch_id === c.b && n.id === c.id);
+      if ('deleted' in c) {
+        if (at >= 0) list = list.filter((_, i) => i !== at);
+      } else {
+        const base: BatchNotice =
+          at >= 0 ? list[at] : { batch_id: c.b, id: c.id, body: '', pinned: false, created_at: c.at, deleted_at: null, seq: 0 };
+        const next = { ...base, ...c.data, pending: true };
+        list = at >= 0 ? list.map((n, i) => (i === at ? next : n)) : [...list, next];
+      }
     } else {
       const byMonth = (months[c.e] ??= {});
       const row = byMonth[c.m] ?? { enrolment_id: c.e, month: c.m, batch_id: c.b, att: {}, fee: null, score: {}, remark: null, seq: 0 };
       byMonth[c.m] = patchMonth(row, c.patch);
     }
   }
+  return list;
 }
 
 /** Re-read the phone's copy into memory. */
@@ -124,7 +141,7 @@ export async function loadLocalStore(db: SQLiteDatabase): Promise<void> {
   const batches = Object.fromEntries(rows.batches.map((b) => [b.id, b]));
   const batchMonths = index(rows.batchMonths, (r) => r.batch_id, (r) => r.month);
   const months = index(rows.months, (r) => r.enrolment_id, (r) => r.month);
-  overlay(batches, batchMonths, months, rows.outbox);
+  const notices = overlay(batches, batchMonths, months, rows.notices, rows.outbox);
   useLocalStore.setState({
     ready: true,
     account: rows.account,
@@ -132,10 +149,7 @@ export async function loadLocalStore(db: SQLiteDatabase): Promise<void> {
     batches,
     batchMonths,
     tests: group(rows.tests, (r) => r.batch_id),
-    notices: group(
-      rows.notices.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.created_at - a.created_at),
-      (r) => r.batch_id,
-    ),
+    notices: group(sortNotices(notices), (r) => r.batch_id),
     enrolments: group(
       rows.enrolments.sort((a, b) => a.requested_at - b.requested_at),
       (r) => r.batch_id,

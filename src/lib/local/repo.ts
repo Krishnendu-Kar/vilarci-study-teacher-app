@@ -132,6 +132,8 @@ export interface OutboxLine {
 function outboxKey(c: Change): string {
   if (c.t === 'batches') return `b:${c.b}`;
   if (c.t === 'batch_months') return `bm:${c.b}:${c.m}`;
+  // A notice is sent whole, so a later edit (or the delete) simply replaces the unsent one.
+  if (c.t === 'batch_notices') return `bn:${c.b}:${c.id}`;
   return `em:${c.e}:${c.m}`;
 }
 

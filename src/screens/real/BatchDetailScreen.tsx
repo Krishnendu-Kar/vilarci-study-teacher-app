@@ -32,6 +32,8 @@ import { useToast } from '../../components/ui/Toast';
 import { RealTopBar } from '../../components/real/RealTopBar';
 import { SyncBanner } from '../../components/real/SyncBanner';
 import { BatchAttendanceCard } from '../../components/real/ClassAttendance';
+import { NoticeCard } from '../../components/real/NoticeParts';
+import { useBatchNotices } from '../../lib/api/notices';
 
 const RELATION_LABELS: Record<string, string> = {
   self: 'Self',
@@ -55,6 +57,7 @@ export function BatchDetailScreen() {
   const decide = useDecideRequest();
   const removeMember = useRemoveMember();
   const remove = useDeleteBatch();
+  const notices = useBatchNotices(id);
   const { refreshing, refresh } = useRefresh();
   const [menu, setMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -177,6 +180,51 @@ export function BatchDetailScreen() {
         {/* ── Attendance: today's class and the register ───────────────── */}
         <BatchAttendanceCard batch={b} />
 
+        {/* ── Notices: the latest two, the rest one tap away ───────────── */}
+        <View style={{ marginTop: spacing.xxl }}>
+          <SectionHeader
+            title="Notices"
+            subtitle={notices.length ? `${notices.length} for parents` : undefined}
+            action={notices.length ? 'All' : undefined}
+            onAction={() => navigation.navigate('BatchNotices', { id: b.id })}
+          />
+          {notices.length ? (
+            <View style={{ gap: spacing.md }}>
+              {notices.slice(0, 2).map((n) => (
+                <Pressable
+                  key={n.id}
+                  onPress={() => navigation.navigate('BatchNotices', { id: b.id })}
+                  accessibilityRole="button"
+                  style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+                >
+                  <NoticeCard notice={n} lines={3} />
+                </Pressable>
+              ))}
+              <Button
+                label="Post a notice"
+                iconName="send-outline"
+                variant="secondary"
+                size="sm"
+                onPress={() => navigation.navigate('BatchNotices', { id: b.id, compose: true })}
+                style={{ alignSelf: 'flex-start' }}
+              />
+            </View>
+          ) : (
+            <Card muted>
+              <AppText variant="caption" tone="muted">
+                Tell every parent about holidays, test dates and reminders in one go.
+              </AppText>
+              <Button
+                label="Post a notice"
+                iconName="send-outline"
+                size="sm"
+                onPress={() => navigation.navigate('BatchNotices', { id: b.id, compose: true })}
+                style={{ marginTop: spacing.md, alignSelf: 'flex-start' }}
+              />
+            </Card>
+          )}
+        </View>
+
         {/* ── Requests ─────────────────────────────────────────────────── */}
         {requests.length ? (
           <View style={{ marginTop: spacing.xxl }}>
@@ -280,6 +328,12 @@ export function BatchDetailScreen() {
             title="Add students"
             subtitle="QR code, join link and code"
             onPress={fromMenu(() => navigation.navigate('BatchInvite', { id: b.id }))}
+          />
+          <MenuRow
+            icon="megaphone-outline"
+            title="Post a notice"
+            subtitle="Every parent in the batch sees it"
+            onPress={fromMenu(() => navigation.navigate('BatchNotices', { id: b.id, compose: true }))}
           />
           <MenuRow
             icon="create-outline"
