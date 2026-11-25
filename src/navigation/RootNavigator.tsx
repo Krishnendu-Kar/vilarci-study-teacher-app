@@ -25,7 +25,12 @@ import { BatchNoticesScreen } from '../screens/real/BatchNoticesScreen';
 import { BatchTestsScreen } from '../screens/real/BatchTestsScreen';
 import { TestMarksScreen } from '../screens/real/TestMarksScreen';
 import { AttendanceRegisterScreen } from '../screens/real/AttendanceRegisterScreen';
-import { ComingSoonScreen, InstitutesComingSoon } from '../screens/real/ComingSoonScreen';
+import { ComingSoonScreen } from '../screens/real/ComingSoonScreen';
+import { InstitutesScreen as RealInstitutesScreen } from '../screens/real/InstitutesScreen';
+import { InstituteScreen as RealInstituteScreen } from '../screens/real/InstituteScreen';
+import { InstituteFormScreen } from '../screens/real/InstituteFormScreen';
+import { InstituteJoinScreen } from '../screens/real/InstituteJoinScreen';
+import { InstituteCodesScreen } from '../screens/real/InstituteCodesScreen';
 import { MoreScreen as RealMoreScreen } from '../screens/real/MoreScreen';
 import { RealSideMenuProvider } from '../components/real/RealSideMenu';
 import { realNavigationRef } from './realNavigationRef';
@@ -52,6 +57,7 @@ const RealTabs = createBottomTabNavigator();
 const RealHomeStack = createNativeStackNavigator();
 const RealBatchesStack = createNativeStackNavigator();
 const RealMoreStack = createNativeStackNavigator();
+const RealInstitutesStack = createNativeStackNavigator();
 
 function RealHomeNavigator() {
   return (
@@ -71,7 +77,7 @@ function RealBatchesNavigator() {
     <RealBatchesStack.Navigator screenOptions={pushOptions}>
       <RealBatchesStack.Screen name="BatchList" component={RealBatchesScreen} />
       <RealBatchesStack.Screen name="BatchForm" component={BatchFormScreen} />
-      <RealBatchesStack.Screen name="BatchDetail" component={BatchDetailScreen} />
+      <RealBatchesStack.Screen name="BatchDetail" component={BatchDetailScreen} getId={routeId} />
       <RealBatchesStack.Screen name="StudentFees" component={StudentFeesScreen} />
       <RealBatchesStack.Screen name="BatchInvite" component={BatchInviteScreen} />
       <RealBatchesStack.Screen name="BatchInfo" component={BatchInfoScreen} />
@@ -81,6 +87,29 @@ function RealBatchesNavigator() {
       <RealBatchesStack.Screen name="AttendanceDay" component={AttendanceDayScreen} />
       <RealBatchesStack.Screen name="AttendanceRegister" component={AttendanceRegisterScreen} />
     </RealBatchesStack.Navigator>
+  );
+}
+
+/** Institutes: the list, one institute, and its sections and subjects (the batch screens). */
+function RealInstitutesNavigator() {
+  return (
+    <RealInstitutesStack.Navigator screenOptions={pushOptions}>
+      <RealInstitutesStack.Screen name="InstituteList" component={RealInstitutesScreen} />
+      <RealInstitutesStack.Screen name="Institute" component={RealInstituteScreen} getId={routeId} />
+      <RealInstitutesStack.Screen name="InstituteForm" component={InstituteFormScreen} />
+      <RealInstitutesStack.Screen name="InstituteJoin" component={InstituteJoinScreen} />
+      <RealInstitutesStack.Screen name="InstituteCodes" component={InstituteCodesScreen} />
+      <RealInstitutesStack.Screen name="BatchForm" component={BatchFormScreen} />
+      <RealInstitutesStack.Screen name="BatchDetail" component={BatchDetailScreen} getId={routeId} />
+      <RealInstitutesStack.Screen name="StudentFees" component={StudentFeesScreen} />
+      <RealInstitutesStack.Screen name="BatchInvite" component={BatchInviteScreen} />
+      <RealInstitutesStack.Screen name="BatchInfo" component={BatchInfoScreen} />
+      <RealInstitutesStack.Screen name="BatchNotices" component={BatchNoticesScreen} />
+      <RealInstitutesStack.Screen name="BatchTests" component={BatchTestsScreen} />
+      <RealInstitutesStack.Screen name="TestMarks" component={TestMarksScreen} />
+      <RealInstitutesStack.Screen name="AttendanceDay" component={AttendanceDayScreen} />
+      <RealInstitutesStack.Screen name="AttendanceRegister" component={AttendanceRegisterScreen} />
+    </RealInstitutesStack.Navigator>
   );
 }
 
@@ -227,7 +256,7 @@ export function RootNavigator() {
         >
           <RealTabs.Screen name="Home" component={RealHomeNavigator} />
           <RealTabs.Screen name="Batches" component={RealBatchesNavigator} />
-          <RealTabs.Screen name="Institutes" component={InstitutesComingSoon} />
+          <RealTabs.Screen name="Institutes" component={RealInstitutesNavigator} />
           <RealTabs.Screen name="More" component={RealMoreNavigator} />
         </RealTabs.Navigator>
       </NavigationContainer>

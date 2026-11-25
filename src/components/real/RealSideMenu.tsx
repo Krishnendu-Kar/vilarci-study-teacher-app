@@ -41,7 +41,7 @@ interface MenuItem {
 }
 
 /** The first screen of each tab's stack; anything else opens on top of it. */
-const STACK_ROOTS = ['TeacherHome', 'BatchList', 'MoreHub'];
+const STACK_ROOTS = ['TeacherHome', 'BatchList', 'InstituteList', 'MoreHub'];
 
 /** Only what a teacher reaches for; the rest of the plan lives in the demo. */
 const SECTIONS: { title: string; items: MenuItem[] }[] = [
@@ -50,7 +50,7 @@ const SECTIONS: { title: string; items: MenuItem[] }[] = [
     items: [
       { label: 'Home', icon: 'home-outline', to: { tab: 'Home', screen: 'TeacherHome' } },
       { label: 'Private batches', icon: 'people-outline', to: { tab: 'Batches', screen: 'BatchList' } },
-      { label: 'Coaching institutes', icon: 'business-outline', to: { tab: 'Institutes' }, badge: 'Soon' },
+      { label: 'Coaching institutes', icon: 'business-outline', to: { tab: 'Institutes', screen: 'InstituteList' } },
     ],
   },
   {

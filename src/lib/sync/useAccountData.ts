@@ -32,7 +32,10 @@ export function useAccountData(userId: string | undefined): void {
         requestSync();
       })
       .catch((err) => {
-        if (live) useLocalStore.setState({ ready: true, syncError: String((err as Error)?.message ?? err) });
+        if (live) {
+          const why = String((err as Error)?.message ?? err);
+          useLocalStore.setState({ ready: true, syncError: `This device couldn’t open its saved copy (${why}). Reload the app.` });
+        }
       });
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') requestSync({ ifOlderThanMs: 60_000 });

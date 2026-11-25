@@ -3,7 +3,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useTheme } from '../../theme/ThemeProvider';
 import { spacing } from '../../theme/tokens';
-import { feeFor, gradeBoardLabel, useBatchRoster, usePrivateBatch } from '../../lib/api/privateBatches';
+import { batchKind, feeFor, gradeBoardLabel, useBatchRole, useBatchRoster, usePrivateBatch } from '../../lib/api/privateBatches';
 import { DAY_KEYS, DAY_LABELS, isClosed } from '../../lib/utils/schedule';
 import { formatDateLong, money, todayIso } from '../../lib/utils/format';
 import { courseLabel } from '../../lib/utils/months';
@@ -19,6 +19,7 @@ export function BatchInfoScreen() {
   const id: string = useRoute<any>().params?.id;
   const { data: b, isLoading } = usePrivateBatch(id);
   const { data: roster } = useBatchRoster(id);
+  const role = useBatchRole(id);
 
   if (isLoading || !b) {
     return (
@@ -36,6 +37,9 @@ export function BatchInfoScreen() {
   }
 
   const level = gradeBoardLabel(b);
+  const kind = batchKind(b);
+  // Subjects are edited from their section (teacher, timetable); only those who run a batch edit it.
+  const canEdit = role === 'owner';
   const members = roster.filter((r) => r.status === 'approved');
   const waiting = roster.filter((r) => r.status === 'pending').length;
   const ownFee = members.filter((r) => feeFor(r, b) !== b.monthly_fee).length;
@@ -43,29 +47,38 @@ export function BatchInfoScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgApp }}>
       <RealTopBar
-        title="Batch info"
-        right={<Button label="Edit" iconName="create-outline" size="sm" variant="secondary" onPress={() => navigation.navigate('BatchForm', { id: b.id })} />}
+        title={kind === 'section' ? 'Section info' : kind === 'subject' ? 'Subject info' : 'Batch info'}
+        right={
+          canEdit && kind !== 'subject' ? (
+            <Button label="Edit" iconName="create-outline" size="sm" variant="secondary" onPress={() => navigation.navigate('BatchForm', { id: b.id })} />
+          ) : undefined
+        }
       />
       <Screen>
         <AppText variant="title">{b.name}</AppText>
         <Row gap={5} wrap style={{ marginTop: spacing.sm }}>
-          <Pill label={b.subject} tone="primary" />
+          {kind === 'section' ? null : <Pill label={b.subject} tone="primary" />}
+          {b.institute_card ? <Pill label={b.institute_card.name} tone="gold" /> : null}
           {level ? <Pill label={level} /> : null}
         </Row>
 
         <Card style={{ marginTop: spacing.lg }}>
-          <KeyValue label="Monthly fee" value={`${money(b.monthly_fee)} / month`} />
-          {ownFee ? <KeyValue label="Own fee" value={`${ownFee} student${ownFee === 1 ? '' : 's'}`} /> : null}
+          {kind === 'subject' ? (
+            <KeyValue label="Teacher" value={b.teacher_card?.name || 'Not given yet'} />
+          ) : (
+            <KeyValue label="Monthly fee" value={`${money(b.monthly_fee)} / month`} />
+          )}
+          {ownFee && kind !== 'subject' ? <KeyValue label="Own fee" value={`${ownFee} student${ownFee === 1 ? '' : 's'}`} /> : null}
           <KeyValue label="Course" value={courseLabel(b.course_start, b.course_end) ?? 'Not set — tap Edit'} />
           <Divider style={{ marginVertical: spacing.sm }} />
-          <KeyValue label="Seats" value={`${members.length} of ${b.capacity} filled`} />
+          <KeyValue label={kind === 'subject' ? 'Students' : 'Seats'} value={kind === 'subject' ? `${members.length} from the section` : `${members.length} of ${b.capacity} filled`} />
           {waiting ? <KeyValue label="Requests waiting" value={String(waiting)} /> : null}
           <KeyValue label="Room / venue" value={b.room || '—'} />
-          <KeyValue label="Join code" value={b.join_code} />
+          {kind === 'subject' ? null : <KeyValue label="Join code" value={b.join_code} />}
           <KeyValue label="Created" value={formatDateLong(todayIso(new Date(b.created_at)))} />
         </Card>
 
-        <View style={{ marginTop: spacing.xxl }}>
+        <View style={{ marginTop: spacing.xxl, display: kind === 'section' ? 'none' : 'flex' }}>
           <SectionHeader title="Weekly timetable" />
           <Card padded={false}>
             {DAY_KEYS.map((d, i) => {

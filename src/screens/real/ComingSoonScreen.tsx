@@ -34,17 +34,12 @@ export function ComingSoonScreen({ title: titleProp, icon: iconProp }: { title?:
           {title}
         </AppText>
         <AppText variant="body" tone="secondary" center style={{ marginTop: spacing.sm, maxWidth: 320 }}>
-          We're connecting this to your real account next. You can already see how it will work in the demo.
+          We’re connecting this to your real account next. You can already see how it will work in the demo.
         </AppText>
         <Button label={`Preview ${title} in the demo`} iconName="play-circle-outline" variant="secondary" onPress={enterDemo} style={{ marginTop: spacing.xl }} />
       </View>
     </View>
   );
-}
-
-/** Institutes tab until institutes are built for real. */
-export function InstitutesComingSoon() {
-  return <ComingSoonScreen title="Institutes" icon="business-outline" />;
 }
 
 const styles = StyleSheet.create({

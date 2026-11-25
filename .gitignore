@@ -60,3 +60,6 @@ service-account*.json
 .idea/
 .claude/settings.local.json
 *.log
+
+# database migrations and SQL tests live in the student app's folder, not in git
+supabase/

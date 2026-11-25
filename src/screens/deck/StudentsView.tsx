@@ -73,7 +73,7 @@ export function StudentsView({ data, goTo }: DeckViewProps) {
             <Row gap={spacing.sm}>
               <Ionicons name="wallet-outline" size={16} color={colors.warning} />
               <AppText variant="caption" tone="secondary" style={{ flex: 1 }}>
-                {unpaid} student{unpaid === 1 ? '' : 's'} yet to pay this month's fee
+                {unpaid} student{unpaid === 1 ? '' : 's'} yet to pay this month’s fee
               </AppText>
               <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
             </Row>

@@ -3,6 +3,7 @@
 // logging out can delete it. Rows are stored as the server sent them
 // (data = JSON) with the few columns needed to find, replace and delete them.
 // The outbox holds the teacher's edits until the server has them.
+import { Platform } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 
 const VERSION = 1;
@@ -10,7 +11,10 @@ const VERSION = 1;
 let current: { userId: string; db: SQLite.SQLiteDatabase } | null = null;
 let opening: { userId: string; promise: Promise<SQLite.SQLiteDatabase> } | null = null;
 
-const fileName = (userId: string) => `vilarci-teacher-${userId}.db`;
+// On web, SQLite paths (with "-journal" added) must fit in 64 characters, and
+// "vilarci-teacher-<36-char id>.db" didn't: the copy never opened there. Phones
+// keep the long name so their existing copies (and unsent edits) stay put.
+const fileName = (userId: string) => `${Platform.OS === 'web' ? 'vt' : 'vilarci-teacher'}-${userId}.db`;
 
 /** The open database and whose it is, or null when nobody is signed in. */
 export function currentDb(): { userId: string; db: SQLite.SQLiteDatabase } | null {

@@ -7,7 +7,7 @@ import { useMutation } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
 import { supabase } from '../supabase';
 import { useLocalStore } from '../local/store';
-import type { Batch, BatchFields, Enrolment, EnrolmentStatus } from '../local/types';
+import type { Batch, BatchFields, BatchKind, Enrolment, EnrolmentStatus } from '../local/types';
 import { requestSync, saveEdit } from '../sync/engine';
 
 export type PrivateBatchRow = Batch;
@@ -81,20 +81,36 @@ function useLoading(): boolean {
   return useLocalStore((s) => !s.ready || !s.account);
 }
 
-/** The batches this account teaches (not deleted), newest first. */
+/** private, section or subject (rows from before institutes are private). */
+export function batchKind(b: Pick<Batch, 'kind'> | undefined): BatchKind {
+  return b?.kind ?? 'private';
+}
+
+/**
+ * The classes this account takes itself (not deleted), newest first: its own
+ * batches and the institute subjects it teaches. Institute sections and other
+ * teachers' subjects (which admins also run) live under Institutes.
+ */
 export function usePrivateBatches(): { data: Batch[]; isLoading: boolean } {
   const isLoading = useLoading();
   const teaching = useLocalStore((s) => s.account?.teaching);
+  const myId = useLocalStore((s) => s.account?.me?.id);
   const batches = useLocalStore((s) => s.batches);
   const data = useMemo(
     () =>
       (teaching ?? [])
         .filter((t) => t.deleted_at == null && batches[t.batch_id])
         .map((t) => batches[t.batch_id])
+        .filter((b) => batchKind(b) === 'private' || (batchKind(b) === 'subject' && b.teacher_id === myId))
         .sort((a, b) => b.created_at - a.created_at),
-    [teaching, batches],
+    [teaching, batches, myId],
   );
   return { data, isLoading };
+}
+
+/** How this account stands on a batch: 'owner' runs it, 'subject' teaches it (institute subject teacher), null = not staff. */
+export function useBatchRole(id: string | undefined): string | null {
+  return useLocalStore((s) => (id ? s.account?.teaching.find((t) => t.batch_id === id)?.role ?? null : null));
 }
 
 export interface DeletedBatch {
@@ -113,7 +129,7 @@ export function useDeletedBatches(): DeletedBatch[] {
   return useMemo(
     () =>
       (teaching ?? [])
-        .filter((t) => t.deleted_at != null && t.role === 'owner')
+        .filter((t) => t.deleted_at != null && t.role === 'owner' && (t.kind ?? 'private') === 'private')
         .map((t) => ({ id: t.batch_id, name: t.name, deleted_at: t.deleted_at as number, batch: batches[t.batch_id] }))
         .sort((a, b) => b.deleted_at - a.deleted_at),
     [teaching, batches],

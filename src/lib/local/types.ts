@@ -35,11 +35,91 @@ export interface TeacherProfile {
   updated_at: string;
 }
 
+/** private = the teacher's own batch; an institute has sections (students join) and their subjects. */
+export type BatchKind = 'private' | 'section' | 'subject';
+
 export interface Teaching {
   batch_id: string;
+  /** owner: runs the batch (private owner, institute owner or admin) · subject: teaches one institute subject. */
   role: string;
   name: string;
   deleted_at: number | null;
+  /** Missing on snapshots from before institutes (= private). */
+  kind?: BatchKind;
+  institute_id?: string | null;
+  parent_id?: string | null;
+}
+
+export type InstituteRole = 'owner' | 'admin' | 'teacher';
+export type StaffStatus = 'pending' | 'active' | 'declined' | 'left' | 'removed';
+
+/** What families see of an institute (carried on its sections and subjects). */
+export interface InstituteCard {
+  id: string;
+  name: string;
+  tagline: string;
+  logo_text: string;
+  theme_color: string;
+  address: string;
+  phone: string;
+  email: string;
+  established: number | null;
+}
+
+export interface InstituteMember {
+  user_id: string;
+  name: string;
+  /** Only admins get phone numbers. */
+  whatsapp: string | null;
+  role: InstituteRole;
+  status: StaffStatus;
+  title: string;
+  subjects: string[];
+  requested_at: number;
+  decided_at: number | null;
+}
+
+export interface InstituteSubject {
+  batch_id: string;
+  subject: string;
+  teacher_id: string | null;
+  teacher_name: string | null;
+  weekly_schedule: WeekSchedule;
+  room: string;
+}
+
+export interface InstituteSection {
+  batch_id: string;
+  name: string;
+  grade: string | null;
+  board: string | null;
+  room: string;
+  capacity: number;
+  monthly_fee: number;
+  course_start: string | null;
+  course_end: string | null;
+  join_code: string;
+  deleted_at: number | null;
+  created_at: number;
+  students: number;
+  requests: number;
+  subjects: InstituteSubject[];
+}
+
+/** An institute this account belongs to (or asked to join), from the account snapshot. */
+export interface Institute extends InstituteCard {
+  owner_id: string;
+  /** Students' code (VLI-…), for active members. */
+  join_code: string | null;
+  /** Teachers' code (VLS-…), for the owner and admins. */
+  staff_code: string | null;
+  created_at: number;
+  deleted_at: number | null;
+  my_role: InstituteRole;
+  my_status: StaffStatus;
+  /** Null while this account's request is pending. */
+  members: InstituteMember[] | null;
+  sections: InstituteSection[] | null;
 }
 
 export interface AccountSnapshot {
@@ -48,11 +128,22 @@ export interface AccountSnapshot {
   teacher: TeacherProfile | null;
   /** Batches this account teaches, deleted ones included. */
   teaching: Teaching[];
+  /** Missing on snapshots from before institutes. */
+  institutes?: Institute[];
 }
 
 export interface Batch {
   id: string;
   owner_id: string;
+  /** Missing on rows downloaded before institutes (= private). */
+  kind?: BatchKind;
+  institute_id?: string | null;
+  /** A subject's section. */
+  parent_id?: string | null;
+  /** A subject's teacher. */
+  teacher_id?: string | null;
+  institute_card?: InstituteCard | null;
+  teacher_card?: { name?: string } | null;
   name: string;
   subject: string;
   grade: string | null;

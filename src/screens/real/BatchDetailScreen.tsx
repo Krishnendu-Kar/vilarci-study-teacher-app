@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme } from '../../theme/ThemeProvider';
 import { radius, spacing } from '../../theme/tokens';
 import {
+  batchKind,
   describeBatchError,
   describeMemberError,
   feeFor,
@@ -16,8 +17,12 @@ import {
   useDecideRequest,
   useDeleteBatch,
   usePrivateBatch,
+  useBatchRole,
   useRemoveMember,
 } from '../../lib/api/privateBatches';
+import { useInstituteOf, useSectionInfo } from '../../lib/api/institutes';
+import { summarizeSchedule } from '../../lib/utils/schedule';
+import { SubjectDraft, SubjectSheet } from '../../components/real/SubjectSheet';
 import type { ContactCard } from '../../lib/local/types';
 import { useRefresh } from '../../lib/sync/useRefresh';
 import { formatDateLong, money, todayIso } from '../../lib/utils/format';
@@ -52,7 +57,12 @@ const RELATION_LABELS: Record<string, string> = {
 /** A millisecond time as "14 Oct 2026". */
 const dayOf = (ms: number) => formatDateLong(todayIso(new Date(ms)));
 
-/** One batch: today's attendance, requests to approve and students. Everything else is in the ⋮ menu. */
+/**
+ * One batch: today's attendance, requests to approve and students. Everything
+ * else is in the ⋮ menu. Also an institute's section (students, fees,
+ * approvals, notices and its subjects — no classes of its own) and a subject
+ * (classes, attendance, tests, notices; students come from the section).
+ */
 export function BatchDetailScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation<any>();
@@ -70,6 +80,11 @@ export function BatchDetailScreen() {
   const me = useLocalStore((s) => s.account?.me);
   const teacherName = me ? [me.first_name, me.last_name].filter(Boolean).join(' ') : '';
   const { refreshing, refresh } = useRefresh();
+  const role = useBatchRole(id);
+  const institute = useInstituteOf(b);
+  const sectionInfo = useSectionInfo(b);
+  const parent = useLocalStore((s) => (b?.parent_id ? s.batches[b.parent_id] : undefined));
+  const [subjectSheet, setSubjectSheet] = useState<{ editing: SubjectDraft | null } | null>(null);
   const [menu, setMenu] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
@@ -93,6 +108,12 @@ export function BatchDetailScreen() {
     );
   }
 
+  const kind = batchKind(b);
+  const isSection = kind === 'section';
+  const isSubject = kind === 'subject';
+  /** Runs the batch: a private batch's owner, or the institute's owner / an admin. */
+  const runs = role === 'owner';
+  const noun = isSection ? 'section' : isSubject ? 'subject' : 'batch';
   const rows = roster.data;
   const requests = rows.filter((r) => r.status === 'pending');
   const members = rows.filter((r) => r.status === 'approved');
@@ -102,7 +123,9 @@ export function BatchDetailScreen() {
   const shareLink = () =>
     Share.share({
       message:
-        `Join my ${b.subject} batch "${b.name}"${level ? ` (${level})` : ''} on Vilarci Study.\n\n` +
+        (isSection
+          ? `Join ${b.name}${level ? ` (${level})` : ''} at ${institute?.name ?? 'our institute'} on Vilarci Study.\n\n`
+          : `Join my ${b.subject} batch "${b.name}"${level ? ` (${level})` : ''} on Vilarci Study.\n\n`) +
         `Tap to join: ${joinLinkFor(b.join_code)}\nJoin code: ${b.join_code}`,
     }).catch(() => {});
 
@@ -136,7 +159,14 @@ export function BatchDetailScreen() {
     setConfirmDelete(false);
     try {
       await remove.mutateAsync(b.id);
-      toast.toast('Batch deleted — restore it from Private batches', 'info');
+      toast.toast(
+        isSection
+          ? 'Section deleted — restore it from the institute page'
+          : isSubject
+            ? 'Subject deleted'
+            : 'Batch deleted — restore it from Private batches',
+        'info',
+      );
       navigation.goBack();
     } catch (err) {
       toast.toast(describeBatchError(err), 'error');
@@ -165,7 +195,10 @@ export function BatchDetailScreen() {
         {/* ── The batch at a glance ────────────────────────────────────── */}
         <HeroCard>
           <AppText variant="overline" style={{ color: colors.goldBright }} numberOfLines={1}>
-            {[b.subject, level].filter(Boolean).join(' · ').toUpperCase()}
+            {(isSection ? [institute?.name ?? 'Section', level] : isSubject ? [b.subject, institute?.name] : [b.subject, level])
+              .filter(Boolean)
+              .join(' · ')
+              .toUpperCase()}
           </AppText>
           <AppText variant="display" numberOfLines={2} style={{ color: '#FDFBF9', marginTop: 2 }}>
             {b.name}
@@ -174,22 +207,107 @@ export function BatchDetailScreen() {
             <HeroLine icon="people-outline" text={`${members.length} of ${b.capacity} students${requests.length ? ` · ${requests.length} waiting` : ''}`} />
             {course ? <HeroLine icon="calendar-outline" text={course} /> : null}
             {b.room ? <HeroLine icon="location-outline" text={b.room} /> : null}
-            <HeroLine icon="key-outline" text={`Join code ${b.join_code}`} />
+            {isSubject ? (
+              <HeroLine
+                icon="person-outline"
+                text={b.teacher_card?.name ? `Taught by ${b.teacher_card.name}${b.teacher_id === me?.id ? ' (you)' : ''}` : 'No teacher yet'}
+              />
+            ) : (
+              <HeroLine icon="key-outline" text={`Join code ${b.join_code}`} />
+            )}
           </View>
-          <Pressable
-            onPress={() => navigation.navigate('BatchInvite', { id: b.id })}
-            accessibilityRole="button"
-            style={({ pressed }) => [styles.heroBtn, { opacity: pressed ? 0.8 : 1 }]}
-          >
-            <Ionicons name="person-add-outline" size={16} color="#3B0A1A" />
-            <AppText variant="captionStrong" style={{ color: '#3B0A1A' }}>
-              Add students
-            </AppText>
-          </Pressable>
+          {isSubject ? (
+            parent && runs ? (
+              <Pressable
+                onPress={() => navigation.navigate('BatchDetail', { id: parent.id })}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.heroBtn, { opacity: pressed ? 0.8 : 1 }]}
+              >
+                <Ionicons name="people-outline" size={16} color="#3B0A1A" />
+                <AppText variant="captionStrong" style={{ color: '#3B0A1A' }}>
+                  Section {parent.name}
+                </AppText>
+              </Pressable>
+            ) : null
+          ) : runs ? (
+            <Pressable
+              onPress={() => navigation.navigate('BatchInvite', { id: b.id })}
+              accessibilityRole="button"
+              style={({ pressed }) => [styles.heroBtn, { opacity: pressed ? 0.8 : 1 }]}
+            >
+              <Ionicons name="person-add-outline" size={16} color="#3B0A1A" />
+              <AppText variant="captionStrong" style={{ color: '#3B0A1A' }}>
+                Add students
+              </AppText>
+            </Pressable>
+          ) : null}
         </HeroCard>
 
         {/* ── Attendance: today's class and the register ───────────────── */}
-        <BatchAttendanceCard batch={b} />
+        {isSection ? null : <BatchAttendanceCard batch={b} />}
+
+        {/* ── A section's subjects: each has its own teacher and timetable ─ */}
+        {isSection ? (
+          <View style={{ marginTop: spacing.xxl }}>
+            <SectionHeader
+              title="Subjects"
+              subtitle={sectionInfo?.subjects.length ? 'Every student of the section is in each' : undefined}
+              action={runs ? 'Add' : undefined}
+              onAction={() => setSubjectSheet({ editing: null })}
+            />
+            {sectionInfo?.subjects.length ? (
+              <Card padded={false}>
+                {sectionInfo.subjects.map((c, i) => (
+                  <View key={c.batch_id}>
+                    {i > 0 ? <Divider inset={spacing.lg} /> : null}
+                    <Pressable
+                      onPress={() => navigation.navigate('BatchDetail', { id: c.batch_id })}
+                      accessibilityRole="button"
+                      style={({ pressed }) => [styles.subjectRow, { opacity: pressed ? 0.7 : 1 }]}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <AppText variant="subheading">{c.subject}</AppText>
+                        <AppText variant="caption" tone={c.teacher_name ? 'muted' : 'gold'} numberOfLines={1}>
+                          {c.teacher_name ?? 'No teacher yet'} · {summarizeSchedule(c.weekly_schedule)}
+                        </AppText>
+                      </View>
+                      {runs ? (
+                        <Pressable
+                          onPress={() =>
+                            setSubjectSheet({
+                              editing: { id: c.batch_id, subject: c.subject, teacher_id: c.teacher_id, weekly_schedule: c.weekly_schedule, room: c.room },
+                            })
+                          }
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Edit ${c.subject}`}
+                        >
+                          <Ionicons name="create-outline" size={18} color={colors.primary} />
+                        </Pressable>
+                      ) : null}
+                      <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                    </Pressable>
+                  </View>
+                ))}
+              </Card>
+            ) : (
+              <Card muted>
+                <AppText variant="caption" tone="muted">
+                  Add the section’s subjects — like Physics, Chemistry, Maths — and choose a teacher and timetable for each.
+                </AppText>
+                {runs ? (
+                  <Button
+                    label="Add a subject"
+                    iconName="add"
+                    size="sm"
+                    onPress={() => setSubjectSheet({ editing: null })}
+                    style={{ marginTop: spacing.md, alignSelf: 'flex-start' }}
+                  />
+                ) : null}
+              </Card>
+            )}
+          </View>
+        ) : null}
 
         {/* ── Notices: the latest two, the rest one tap away ───────────── */}
         <View style={{ marginTop: spacing.xxl }}>
@@ -236,8 +354,8 @@ export function BatchDetailScreen() {
           )}
         </View>
 
-        {/* ── Tests & marks: the latest two ────────────────────────────── */}
-        <View style={{ marginTop: spacing.xxl }}>
+        {/* ── Tests & marks: the latest two (subjects and private batches) ─ */}
+        <View style={{ marginTop: spacing.xxl, display: isSection ? 'none' : 'flex' }}>
           <SectionHeader
             title="Tests & marks"
             subtitle={tests.length ? `${tests.length} test${tests.length === 1 ? '' : 's'}` : undefined}
@@ -289,7 +407,7 @@ export function BatchDetailScreen() {
         </View>
 
         {/* ── Requests ─────────────────────────────────────────────────── */}
-        {requests.length ? (
+        {requests.length && runs && !isSubject ? (
           <View style={{ marginTop: spacing.xxl }}>
             <SectionHeader title="Join requests" subtitle={`${requests.length} waiting for you`} />
             <View style={{ gap: spacing.md }}>
@@ -313,8 +431,8 @@ export function BatchDetailScreen() {
         <View style={{ marginTop: spacing.xxl }}>
           <SectionHeader
             title="Students"
-            subtitle={`${members.length} of ${b.capacity} seats filled`}
-            action="Add"
+            subtitle={isSubject ? `${members.length} from the section` : `${members.length} of ${b.capacity} seats filled`}
+            action={runs && !isSubject ? 'Add' : undefined}
             onAction={() => navigation.navigate('BatchInvite', { id: b.id })}
           />
           {roster.isLoading ? (
@@ -325,7 +443,8 @@ export function BatchDetailScreen() {
                 <View key={r.id} style={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.md }}>
                   {i > 0 ? <Divider style={{ marginBottom: spacing.md }} /> : null}
                   <Pressable
-                    onPress={() => navigation.navigate('StudentFees', { batchId: b.id, enrolmentId: r.id })}
+                    onPress={runs && !isSubject ? () => navigation.navigate('StudentFees', { batchId: b.id, enrolmentId: r.id }) : undefined}
+                    disabled={!runs || isSubject}
                     accessibilityRole="button"
                     accessibilityLabel={`${r.student_card.first_name}'s fees`}
                     style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
@@ -334,13 +453,15 @@ export function BatchDetailScreen() {
                       <View style={{ flex: 1 }}>
                         <StudentLine row={r} />
                       </View>
-                      <Row gap={4}>
-                        <Ionicons name="wallet-outline" size={15} color={colors.primary} />
-                        <AppText variant="captionStrong" tone="primary">
-                          Fees
-                        </AppText>
-                        <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
-                      </Row>
+                      {runs && !isSubject ? (
+                        <Row gap={4}>
+                          <Ionicons name="wallet-outline" size={15} color={colors.primary} />
+                          <AppText variant="captionStrong" tone="primary">
+                            Fees
+                          </AppText>
+                          <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+                        </Row>
+                      ) : null}
                     </Row>
                   </Pressable>
                   <Row justify="space-between" style={{ marginTop: spacing.sm }}>
@@ -375,11 +496,13 @@ export function BatchDetailScreen() {
                             </Row>
                           </Pressable>
                         ) : null}
-                        <Pressable onPress={() => setConfirmRemove(r.id)} hitSlop={8} accessibilityRole="button">
-                          <AppText variant="captionStrong" tone="error">
-                            Remove
-                          </AppText>
-                        </Pressable>
+                        {runs && !isSubject ? (
+                          <Pressable onPress={() => setConfirmRemove(r.id)} hitSlop={8} accessibilityRole="button">
+                            <AppText variant="captionStrong" tone="error">
+                              Remove
+                            </AppText>
+                          </Pressable>
+                        ) : null}
                       </Row>
                     )}
                   </Row>
@@ -391,15 +514,21 @@ export function BatchDetailScreen() {
               <EmptyState
                 icon="people-outline"
                 title="No students yet"
-                message="Show them the QR or share the join link. Requests show up here for you to accept."
+                message={
+                  isSubject
+                    ? 'Students who join the section show up here automatically.'
+                    : 'Show them the QR or share the join link. Requests show up here for you to accept.'
+                }
               />
-              <Button
-                label="Add students"
-                iconName="person-add-outline"
-                fullWidth
-                onPress={() => navigation.navigate('BatchInvite', { id: b.id })}
-                style={{ marginTop: spacing.md }}
-              />
+              {runs && !isSubject ? (
+                <Button
+                  label="Add students"
+                  iconName="person-add-outline"
+                  fullWidth
+                  onPress={() => navigation.navigate('BatchInvite', { id: b.id })}
+                  style={{ marginTop: spacing.md }}
+                />
+              ) : null}
             </>
           )}
         </View>
@@ -408,60 +537,107 @@ export function BatchDetailScreen() {
       {/* ── ⋮ menu ─────────────────────────────────────────────────────── */}
       <Sheet visible={menu} onClose={() => setMenu(false)} title={b.name} subtitle={[b.subject, level].filter(Boolean).join(' · ')}>
         <View style={{ paddingBottom: spacing.md }}>
-          <MenuRow
-            icon="person-add-outline"
-            title="Add students"
-            subtitle="QR code, join link and code"
-            onPress={fromMenu(() => navigation.navigate('BatchInvite', { id: b.id }))}
-          />
-          <MenuRow
-            icon="document-text-outline"
-            title="Tests & marks"
-            subtitle="Create a test, enter the class’s marks"
-            onPress={fromMenu(() => navigation.navigate('BatchTests', { id: b.id }))}
-          />
+          {runs && !isSubject ? (
+            <MenuRow
+              icon="person-add-outline"
+              title="Add students"
+              subtitle="QR code, join link and code"
+              onPress={fromMenu(() => navigation.navigate('BatchInvite', { id: b.id }))}
+            />
+          ) : null}
+          {isSection ? (
+            runs ? (
+              <MenuRow
+                icon="add-circle-outline"
+                title="Add a subject"
+                subtitle="With its teacher and timetable"
+                onPress={fromMenu(() => setSubjectSheet({ editing: null }))}
+              />
+            ) : null
+          ) : (
+            <MenuRow
+              icon="document-text-outline"
+              title="Tests & marks"
+              subtitle="Create a test, enter the class’s marks"
+              onPress={fromMenu(() => navigation.navigate('BatchTests', { id: b.id }))}
+            />
+          )}
           <MenuRow
             icon="megaphone-outline"
             title="Post a notice"
-            subtitle="Every parent in the batch sees it"
+            subtitle={`Every parent in the ${noun} sees it`}
             onPress={fromMenu(() => navigation.navigate('BatchNotices', { id: b.id, compose: true }))}
           />
-          <MenuRow
-            icon="create-outline"
-            title="Edit batch"
-            subtitle="Name, timetable, fee, seats, course"
-            onPress={fromMenu(() => navigation.navigate('BatchForm', { id: b.id }))}
-          />
+          {runs && isSubject ? (
+            <MenuRow
+              icon="create-outline"
+              title="Edit subject"
+              subtitle="Teacher, room, timetable"
+              onPress={fromMenu(() =>
+                setSubjectSheet({
+                  editing: { id: b.id, subject: b.subject, teacher_id: b.teacher_id ?? null, weekly_schedule: b.weekly_schedule, room: b.room },
+                }),
+              )}
+            />
+          ) : runs ? (
+            <MenuRow
+              icon="create-outline"
+              title={isSection ? 'Edit section' : 'Edit batch'}
+              subtitle={isSection ? 'Name, fee, seats, course' : 'Name, timetable, fee, seats, course'}
+              onPress={fromMenu(() => navigation.navigate('BatchForm', { id: b.id }))}
+            />
+          ) : null}
           <MenuRow
             icon="information-circle-outline"
-            title="Batch info"
-            subtitle="Everything set on this batch"
+            title={isSection ? 'Section info' : isSubject ? 'Subject info' : 'Batch info'}
+            subtitle={`Everything set on this ${noun}`}
             onPress={fromMenu(() => navigation.navigate('BatchInfo', { id: b.id }))}
           />
-          <MenuRow
-            icon="calendar-outline"
-            title="Attendance register"
-            subtitle="Month view of classes and students"
-            onPress={fromMenu(() => navigation.navigate('AttendanceRegister', { batchId: b.id, month: monthOf(todayIso()) }))}
-          />
-          <MenuRow icon="share-social-outline" title="Share join link" onPress={fromMenu(shareLink)} />
-          <Divider style={{ marginVertical: spacing.sm }} />
-          <MenuRow
-            icon="trash-outline"
-            title="Delete batch"
-            subtitle="Students stop seeing it · needs the internet"
-            danger
-            onPress={fromMenu(() => setConfirmDelete(true))}
-          />
+          {isSection ? null : (
+            <MenuRow
+              icon="calendar-outline"
+              title="Attendance register"
+              subtitle="Month view of classes and students"
+              onPress={fromMenu(() => navigation.navigate('AttendanceRegister', { batchId: b.id, month: monthOf(todayIso()) }))}
+            />
+          )}
+          {runs && !isSubject ? <MenuRow icon="share-social-outline" title="Share join link" onPress={fromMenu(shareLink)} /> : null}
+          {runs ? (
+            <>
+              <Divider style={{ marginVertical: spacing.sm }} />
+              <MenuRow
+                icon="trash-outline"
+                title={`Delete ${noun}`}
+                subtitle={isSection ? 'Its subjects go with it · needs the internet' : 'Students stop seeing it · needs the internet'}
+                danger
+                onPress={fromMenu(() => setConfirmDelete(true))}
+              />
+            </>
+          ) : null}
         </View>
       </Sheet>
 
       {whatsApp.sheet}
+      {isSection || isSubject ? (
+        <SubjectSheet
+          visible={subjectSheet != null}
+          onClose={() => setSubjectSheet(null)}
+          sectionId={isSection ? b.id : b.parent_id ?? ''}
+          institute={institute}
+          editing={subjectSheet?.editing}
+        />
+      ) : null}
       <ConfirmSheet
         visible={confirmDelete}
         title={`Delete “${b.name}”?`}
-        message="Students stop seeing it and the join link stops working. You can restore it later from Private batches — students, attendance and fees come back with it. Needs the internet."
-        confirmLabel="Delete batch"
+        message={
+          isSection
+            ? 'Students stop seeing the section and all its subjects, and its join code stops working. You can restore it from the institute page with everything in it. Needs the internet.'
+            : isSubject
+              ? 'Students stop seeing this subject. Its attendance and marks are kept. Needs the internet.'
+              : 'Students stop seeing it and the join link stops working. You can restore it later from Private batches — students, attendance and fees come back with it. Needs the internet.'
+        }
+        confirmLabel={`Delete ${noun}`}
         onClose={() => setConfirmDelete(false)}
         onConfirm={doDelete}
       />
@@ -577,4 +753,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   menuIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  subjectRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
 });

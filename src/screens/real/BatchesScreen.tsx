@@ -6,6 +6,7 @@ import { useTheme } from '../../theme/ThemeProvider';
 import { spacing } from '../../theme/tokens';
 import {
   BATCH_LIMITS,
+  batchKind,
   describeRestoreError,
   gradeBoardLabel,
   PrivateBatchRow,
@@ -34,7 +35,9 @@ export function BatchesScreen() {
   const counts = useBatchCounts();
   const { refreshing, refresh } = useRefresh();
   const list = batches.data;
-  const atLimit = list.length >= BATCH_LIMITS.perTeacher;
+  // The limit counts the teacher's own batches, not the institute subjects they take.
+  const own = list.filter((b) => batchKind(b) === 'private').length;
+  const atLimit = own >= BATCH_LIMITS.perTeacher;
 
   const newBatchButton = teacher.data && list.length > 0 && !atLimit ? (
     <Button label="New" iconName="add" size="sm" onPress={() => navigation.navigate('BatchForm')} />
@@ -79,7 +82,8 @@ export function BatchesScreen() {
         ) : (
           <View style={{ gap: spacing.md }}>
             <AppText variant="caption" tone="muted">
-              {list.length} batch{list.length === 1 ? '' : 'es'}
+              {own} batch{own === 1 ? '' : 'es'}
+              {list.length > own ? ` · ${list.length - own} institute subject${list.length - own === 1 ? '' : 's'}` : ''}
               {atLimit ? ` · limit of ${BATCH_LIMITS.perTeacher} reached` : ''}
             </AppText>
             {list.map((b) => (
@@ -183,6 +187,7 @@ export function BatchCard({
           <AppText variant="heading">{b.name}</AppText>
           <Row gap={5} wrap style={{ marginTop: 6 }}>
             <Pill label={b.subject} tone="primary" />
+            {b.institute_card ? <Pill label={b.institute_card.name} tone="gold" icon="business-outline" /> : null}
             {level ? <Pill label={level} /> : null}
             {pending ? <Pill label={`${pending} request${pending === 1 ? '' : 's'}`} tone="gold" icon="person-add-outline" /> : null}
           </Row>

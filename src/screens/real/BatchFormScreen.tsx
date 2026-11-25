@@ -12,6 +12,7 @@ import {
   usePrivateBatch,
   useSaveBatch,
 } from '../../lib/api/privateBatches';
+import { describeInstituteError, useCreateSection, useInstitute } from '../../lib/api/institutes';
 import { useTeacherProfile } from '../../lib/api/teacherProfile';
 import { summarizeSchedule } from '../../lib/utils/schedule';
 import { addMonths, courseLabel, currentMonth } from '../../lib/utils/months';
@@ -28,7 +29,11 @@ type Errors = Partial<Record<'name' | 'subject' | 'grade' | 'board' | 'fee' | 'c
 
 const OTHER = 'Other';
 
-/** Create a private batch, or edit one (route param `id`). */
+/**
+ * Create a private batch, or edit one (route param `id`). With `instituteId`
+ * it creates a section of that institute; editing a section works the same.
+ * Sections have no subject or timetable of their own — their subjects do.
+ */
 export function BatchFormScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation<any>();
@@ -38,6 +43,10 @@ export function BatchFormScreen() {
   const { data: existing } = usePrivateBatch(editingId);
   const { data: teacher } = useTeacherProfile();
   const save = useSaveBatch();
+  const createSection = useCreateSection();
+  const newSectionOf: string | undefined = route.params?.instituteId;
+  const isSection = !!newSectionOf || existing?.kind === 'section';
+  const institute = useInstitute(newSectionOf ?? existing?.institute_id ?? undefined);
 
   const initialSubject = existing?.subject ?? teacher?.primary_subject ?? '';
   const subjectKnown = BATCH_SUBJECTS.includes(initialSubject);
@@ -50,7 +59,7 @@ export function BatchFormScreen() {
   const [room, setRoom] = useState(existing?.room ?? '');
   // The form takes whole rupees; the server keeps paise.
   const [fee, setFee] = useState(existing ? String(Math.round(existing.monthly_fee / 100)) : '');
-  const [capacity, setCapacity] = useState(existing ? String(existing.capacity) : '20');
+  const [capacity, setCapacity] = useState(existing ? String(existing.capacity) : newSectionOf ? '40' : '20');
   const [schedule, setSchedule] = useState(() => toDraft(existing?.weekly_schedule));
   const [courseStart, setCourseStart] = useState(existing?.course_start ?? currentMonth());
   const [courseEnd, setCourseEnd] = useState(existing?.course_end ?? addMonths(existing?.course_start ?? currentMonth(), 11));
@@ -63,9 +72,9 @@ export function BatchFormScreen() {
     const e: Errors = {};
     const n = name.trim();
     if (n.length < BATCH_LIMITS.nameMin || n.length > BATCH_LIMITS.nameMax) {
-      e.name = `Batch name must be ${BATCH_LIMITS.nameMin}–${BATCH_LIMITS.nameMax} characters.`;
+      e.name = `${isSection ? 'Section' : 'Batch'} name must be ${BATCH_LIMITS.nameMin}–${BATCH_LIMITS.nameMax} characters.`;
     }
-    const finalSubject = subject === OTHER ? otherSubject.trim() : subject ?? '';
+    const finalSubject = isSection ? existing?.subject ?? 'Section' : subject === OTHER ? otherSubject.trim() : subject ?? '';
     if (finalSubject.length < 2) e.subject = 'Choose the subject.';
     const feeNum = fee.trim() === '' ? 0 : Number(fee);
     if (!Number.isInteger(feeNum) || feeNum < 0 || feeNum > BATCH_LIMITS.feeMax) e.fee = 'Enter the monthly fee in rupees.';
@@ -80,39 +89,49 @@ export function BatchFormScreen() {
     setFailure(null);
     if (Object.keys(e).length) return;
 
+    const input = {
+      name: n,
+      subject: finalSubject,
+      grade,
+      board,
+      room: room.trim(),
+      monthly_fee: feeNum * 100,
+      capacity: capNum,
+      weekly_schedule: fromDraft(schedule),
+      course_start: courseStart,
+      course_end: courseEnd,
+    };
     try {
-      const id = await save.mutateAsync({
-        id: editingId,
-        input: {
-          name: n,
-          subject: finalSubject,
-          grade,
-          board,
-          room: room.trim(),
-          monthly_fee: feeNum * 100,
-          capacity: capNum,
-          weekly_schedule: fromDraft(schedule),
-          course_start: courseStart,
-          course_end: courseEnd,
-        },
-      });
-      toast.toast(editingId ? 'Batch updated' : `${n} created`, 'success');
+      if (newSectionOf) {
+        const { subject: _section, ...sectionInput } = input;
+        const id = await createSection.mutateAsync({ instituteId: newSectionOf, input: sectionInput });
+        toast.toast(`${n} created — now add its subjects`, 'success');
+        navigation.replace('BatchDetail', { id });
+        return;
+      }
+      const id = await save.mutateAsync({ id: editingId, input });
+      toast.toast(editingId ? (isSection ? 'Section updated' : 'Batch updated') : `${n} created`, 'success');
       if (editingId) navigation.goBack();
       else navigation.replace('BatchDetail', { id });
     } catch (err) {
-      setFailure(describeBatchError(err));
+      setFailure(newSectionOf ? describeInstituteError(err) : describeBatchError(err));
     }
   };
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bgApp }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <RealTopBar title={editingId ? 'Edit batch' : 'New private batch'} />
+      <RealTopBar title={isSection ? (editingId ? 'Edit section' : 'New section') : editingId ? 'Edit batch' : 'New private batch'} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl }} keyboardShouldPersistTaps="handled">
         <ErrorBanner message={failure} />
+        {isSection && institute ? (
+          <AppText variant="caption" tone="muted" style={{ marginBottom: spacing.md }}>
+            {institute.name} · students join a section and get all its subjects. Add the subjects, their teachers and timetables on the section’s page.
+          </AppText>
+        ) : null}
 
         <FormField
-          label="Batch name"
-          placeholder="e.g. Class 10 Physics — Evening"
+          label={isSection ? 'Section name' : 'Batch name'}
+          placeholder={isSection ? 'e.g. Class 10-A' : 'e.g. Class 10 Physics — Evening'}
           maxLength={BATCH_LIMITS.nameMax}
           value={name}
           onChangeText={(t) => {
@@ -122,17 +141,19 @@ export function BatchFormScreen() {
           error={errors.name}
         />
 
-        <ChipGroup
-          label="Subject"
-          options={[...BATCH_SUBJECTS, OTHER]}
-          value={subject}
-          onChange={(v) => {
-            setSubject(v);
-            clear('subject');
-          }}
-          error={errors.subject}
-        />
-        {subject === OTHER ? (
+        {isSection ? null : (
+          <ChipGroup
+            label="Subject"
+            options={[...BATCH_SUBJECTS, OTHER]}
+            value={subject}
+            onChange={(v) => {
+              setSubject(v);
+              clear('subject');
+            }}
+            error={errors.subject}
+          />
+        )}
+        {!isSection && subject === OTHER ? (
           <FormField
             label="Your subject"
             placeholder="e.g. Political Science"
@@ -229,7 +250,7 @@ export function BatchFormScreen() {
           </AppText>
         </View>
 
-        <View style={{ marginTop: spacing.xxl }}>
+        <View style={{ marginTop: spacing.xxl, display: isSection ? 'none' : 'flex' }}>
           <SectionHeader title="Weekly class days" subtitle={summarizeSchedule(fromDraft(schedule))} />
           <WeeklyScheduleEditor
             value={schedule}
@@ -246,17 +267,19 @@ export function BatchFormScreen() {
         </View>
 
         <Button
-          label={editingId ? 'Save changes' : 'Create batch'}
+          label={editingId ? 'Save changes' : isSection ? 'Create section' : 'Create batch'}
           iconName={editingId ? 'checkmark-circle-outline' : 'add-circle-outline'}
           size="lg"
           fullWidth
-          loading={save.isPending}
+          loading={save.isPending || createSection.isPending}
           onPress={submit}
           style={{ marginTop: spacing.xl }}
         />
         {editingId ? null : (
           <AppText variant="caption" tone="muted" center style={{ marginTop: spacing.md }}>
-            A join code is created automatically for students to join.
+            {isSection
+              ? 'The section gets its own join code; families can also find it with the institute’s code.'
+              : 'A join code is created automatically for students to join.'}
           </AppText>
         )}
       </ScrollView>

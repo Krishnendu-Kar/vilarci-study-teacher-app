@@ -61,7 +61,9 @@ export function BatchInviteScreen() {
   const share = () =>
     Share.share({
       message:
-        `Join my ${b.subject} batch "${b.name}"${level ? ` (${level})` : ''} on Vilarci Study.\n\n` +
+        (b.kind === 'section'
+          ? `Join ${b.name}${level ? ` (${level})` : ''}${b.institute_card ? ` at ${b.institute_card.name}` : ''} on Vilarci Study.\n\n`
+          : `Join my ${b.subject} batch "${b.name}"${level ? ` (${level})` : ''} on Vilarci Study.\n\n`) +
         `Tap to join: ${link}\nJoin code: ${b.join_code}\n\nOr open Vilarci Study → Join a batch → Scan QR.`,
     }).catch(() => {});
 
@@ -123,7 +125,9 @@ export function BatchInviteScreen() {
           </Row>
           {full ? (
             <AppText variant="caption" tone="error" style={{ marginTop: 4 }}>
-              The batch is full — increase seats in Edit batch to accept more.
+              {b.kind === 'section'
+                ? 'The section is full — increase seats in Edit section to accept more.'
+                : 'The batch is full — increase seats in Edit batch to accept more.'}
             </AppText>
           ) : null}
           {waiting ? (

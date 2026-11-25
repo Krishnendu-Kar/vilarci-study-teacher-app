@@ -12,6 +12,7 @@ import { loadLocalStore, useLocalStore } from '../local/store';
 import type { AccountSnapshot, Change, ChangeResult, SyncResponse } from '../local/types';
 
 const MAX_ROUNDS = 10;
+const MAX_BOOKMARKS = 300;
 const PAGE_ROWS = 1000;
 /** The server takes up to 500 edits per call. */
 const MAX_CHANGES = 500;
@@ -97,7 +98,8 @@ export function requestSync(opts: { ifOlderThanMs?: number } = {}): Promise<void
         await syncOnce();
       } while (again);
       failures = 0;
-      useLocalStore.setState({ syncError: null });
+      // With no copy open nothing synced: keep the reason it couldn't open on show.
+      if (currentDb()) useLocalStore.setState({ syncError: null });
     } catch (err) {
       failures += 1;
       useLocalStore.setState({ syncError: describeSyncError(err) });
@@ -171,8 +173,12 @@ async function syncOnce(): Promise<void> {
     const account = await repo.readAccount(db);
     const cursors = await repo.readCursors(db);
     const want = wantedBatches(account);
+    // The server takes 300 bookmarks a call: a big institute's admin goes round in turns.
+    const ids = [...want];
+    const turn = ids.length > MAX_BOOKMARKS ? (round * MAX_BOOKMARKS) % ids.length : 0;
+    const asked = ids.length > MAX_BOOKMARKS ? [...ids, ...ids].slice(turn, turn + MAX_BOOKMARKS) : ids;
     const bookmarks: Record<string, number> = {};
-    for (const batchId of want) bookmarks[batchId] = cursors.get(batchId) ?? 0;
+    for (const batchId of asked) bookmarks[batchId] = cursors.get(batchId) ?? 0;
     // Edits go up on the first round; one the server couldn't take waits for the next sync.
     const sent = round === 0 ? (await repo.readOutbox(db)).slice(0, MAX_CHANGES) : [];
 
@@ -189,7 +195,7 @@ async function syncOnce(): Promise<void> {
     const res = data as SyncResponse;
     // The server's clock against the middle of the round trip.
     clockOffset = res.server_now - Math.round((sentAt + Date.now()) / 2);
-    let more = false;
+    let more = ids.length > MAX_BOOKMARKS && (round + 1) * MAX_BOOKMARKS < ids.length;
     const refusals: string[] = [];
 
     await db.withTransactionAsync(async () => {

@@ -1,44 +1,41 @@
 # Vilarci Teacher
 
-The educator app for **Vilarci Study**: the mobile version of the Vilarci Study Partner portal, built with Expo (SDK 57) and the same design system as the student app.
+The teacher app for **Vilarci Study**, built with Expo (SDK 58). Teachers run
+their own tuition batches and coaching institutes; parents and students follow
+along in the Vilarci Study app.
+
+The app keeps a copy of the teacher's batches on the phone (SQLite), so every
+screen opens instantly and attendance, marks, fees, notices and batch edits
+work **offline** — they upload when the internet is back.
 
 ## What a teacher can do
 
-**Two realms**
+**Private batches**
+- Create batches (subject, class, board, room, weekly timetable, monthly fee, seats, course months); edit, delete and restore them.
+- Add students with a QR code, a join link or a join code; accept or decline requests; remove students.
+- **Attendance:** today's classes on Home; mark present / late / absent; cancel a class with a reason or add an extra one; a month register with each student's percentage; monthly remarks for parents.
+- **Tests & marks:** create tests, enter marks (or absent) for the whole class; parents see their child's score and the class average.
+- **Notices:** post, pin, edit and delete notices for every parent in the batch.
+- **Fees:** a month-by-month ledger per student (paid / waived), a student's own fee, WhatsApp reminders.
+- **WhatsApp** a parent straight from the batch, the attendance day or the fees page.
 
-- **My Private Batches**: your own tuition batches across classes. Filter by class, create batches, and rename or reschedule them.
-- **Coaching Institutes**: institutes you own or teach at. Join by a 6-character code or create your own. Each institute workspace has:
-  - My sections
-  - All sections (admins)
-  - Faculty (invite / remove)
-  - Notices
-  - Analytics
-  - Profile
+**Coaching institutes**
+- Create an institute (name, logo letters, colour, contact details) and become its owner, or join one with its **teachers' code** — the owner or an admin approves.
+- **Roles:** the owner makes admins; admins add sections, subjects and teachers, approve students and record fees; teachers take attendance, tests and notices in the subjects they teach.
+- **Sections** (e.g. *Class 10-A*) are what students join — one **institute code / QR** lists them all, or each section has its own code. A section has its fee, seats and course.
+- **Subjects** belong to a section, each with its own teacher, room and timetable. Every student of the section is in each subject automatically.
 
-**The batch command deck.** A private batch and a coaching section open the same deck:
-
-| View | Features |
-| --- | --- |
-| Students | Roster, attendance and fee status, family contacts (call / WhatsApp), invite link & join code, manual registration, remove student |
-| Classes | Real class calendar: regular weekly days (usually 1–2 for private batches), extra classes, cancellations with reasons, WhatsApp notices to parents, registers still owed |
-| Attendance | P/L/A marking on actual class dates, rotating classroom check-in code, parent WhatsApp alerts, date-by-date register; a register on an unscheduled day is saved as an extra class |
-| Homework | Give homework (due at the next real class), check it per student as Full / Partial / None, parent nudges, per-student homework record |
-| Points | Award +50…+200 with category and citation; leaderboard re-ranks live |
-| Tests | Schedule tests, enter marks, mark absentees, weak-topic feedback, ranks / average / pass rate, CBSE grades |
-| Syllabus | Planned target vs actual coverage, live delay calculation, status cycling, add / remove topics |
-| Fees | Month-by-month ledger, record payments, per-student fee setup and history, WhatsApp reminders. No receipts are issued. |
-| Settings | Name, room, fee, 7-day schedule editor with the canonical JSON |
-
-Permissions follow the portal: visiting faculty cannot manage members or sections, and they see fees as read-only where the institute manages them centrally.
-
-**Today** shows the day's classes from every realm (including extra and cancelled ones), a *Needs attention* list of unmarked registers and homework waiting to be checked, outstanding dues, topics behind schedule, and recent honours. Use **More → Switch account** to explore as any demo educator.
+Other screens (Honours, Homework, Syllabus…) are still shown as *Coming soon*; the **Demo** button on Home opens a preview of them with sample data.
 
 ## Run
 
 ```bash
 npm install
-npx expo start        # press a / i / w for Android, iOS or web
-npm run check         # typecheck
+cp .env.example .env.local   # then fill in the Supabase URL and publishable key
+npx expo start               # press a / i / w for Android, iOS or web
+npm run check                # typecheck
+npm run lint                 # lint
 ```
 
-All data is local demo data persisted on the device. Use **Settings → Reset demo data** to restore it.
+Use `npx expo install <package>` to add packages so versions match the SDK.
+On web the local copy runs SQLite as WebAssembly (see `metro.config.js`).

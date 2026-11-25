@@ -126,7 +126,7 @@ export function AccountScreen() {
                 value={profile?.created_at ? formatDateLong(profile.created_at.slice(0, 10)) : '—'}
               />
               <AppText variant="caption" tone="muted" style={{ marginTop: spacing.sm }}>
-                WhatsApp number, email and date of birth are verified at signup and can't be changed here.
+                WhatsApp number, email and date of birth are verified at signup and can’t be changed here.
               </AppText>
             </>
           )}

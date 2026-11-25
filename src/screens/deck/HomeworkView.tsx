@@ -39,7 +39,7 @@ export function useHomeworkTone() {
  */
 export function HomeworkView({ data, focus }: DeckViewProps) {
   const { colors } = useTheme();
-  const { deck, homework, today, roster } = data;
+  const { homework, today, roster } = data;
   const [giving, setGiving] = useState(false);
   const [checking, setChecking] = useState<Homework | null>(null);
   const [deleting, setDeleting] = useState<Homework | null>(null);
